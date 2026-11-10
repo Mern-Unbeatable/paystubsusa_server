@@ -41,7 +41,7 @@ export function createApp(c: Container) {
       genReqId: (req) => (req as express.Request).id,
       autoLogging: { ignore: (req) => req.url === "/healthz" },
       customLogLevel: (_req, res, err) => (err || res.statusCode >= 500 ? "error" : res.statusCode >= 400 ? "warn" : "info"),
-      customSuccessMessage: (req, res, ms) => `${req.method} ${res.statusCode} ${(req as express.Request).originalUrl} ${ms} ms`,
+      customSuccessMessage: (req, res, ms) => `${req.method} ${res.statusCode} ${(req as express.Request).originalUrl} | ${ms} ms`,
     }),
   );
   app.use(helmet());
