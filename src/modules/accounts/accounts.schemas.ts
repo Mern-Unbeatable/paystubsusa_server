@@ -13,6 +13,10 @@ export const updateProfileBody = z
   })
   .strict();
 
+export const avatarParams = z.object({
+  file: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.webp$/),
+});
+
 export const changePasswordBody = z.object({
   currentPassword: z.string().min(1, "Current password is required").max(128),
   newPassword: passwordField,

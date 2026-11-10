@@ -80,7 +80,7 @@ export function createContainer(overrides: Partial<Integrations> = {}) {
   });
   const sessions = new SessionService({ sessions: refreshSessions, users, audit, tx });
   const auth = new AuthService({ users, sessions, verification, audit, orders, tx });
-  const accounts = new AccountsService({ users, sessions, audit, tx });
+  const accounts = new AccountsService({ users, sessions, audit, tx, storage });
   const webhooks = new WebhookService({ gateway, tx, events: webhookEvents, payments: paymentRepo, orders, subscriptions });
   const support = new SupportService(new PrismaContactMessageRepository(), notifications, audit, tx);
   const customerDashboard = new CustomerDashboardService(new PrismaCustomerDashboardRepository(), documents, payments, subscriptions);

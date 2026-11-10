@@ -44,6 +44,10 @@ export class PrismaUserRepository implements UserRepository {
     return prisma.user.update({ where: { id }, data: input });
   }
 
+  setAvatarKey(id: string, avatarKey: string | null) {
+    return prisma.user.update({ where: { id }, data: { avatarKey } });
+  }
+
   async setStripeCustomerId(id: string, customerId: string) {
     await prisma.user.updateMany({ where: { id, stripeCustomerId: null }, data: { stripeCustomerId: customerId } });
     const user = await prisma.user.findUniqueOrThrow({ where: { id }, select: { stripeCustomerId: true } });

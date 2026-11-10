@@ -107,6 +107,7 @@ model User {
   email            String     @unique
   name             String
   phone            String?
+  avatarKey        String?    @map("avatar_key")
   passwordHash     String     @map("password_hash")
   role             Role       @default(customer)
   status           UserStatus @default(active)

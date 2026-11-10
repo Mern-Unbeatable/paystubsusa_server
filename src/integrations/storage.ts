@@ -8,6 +8,8 @@ import { safeEqual } from "../shared/crypto/tokens.ts";
 
 export interface ObjectStorage {
   put(key: string, body: Buffer, contentType: string): Promise<void>;
+  /** Null when the object does not exist. */
+  get(key: string): Promise<Buffer | null>;
   /** Short-lived GET URL that downloads as `fileName`. */
   presignDownload(key: string, fileName: string, ttlSeconds: number): Promise<string>;
   delete(key: string): Promise<void>;
@@ -37,6 +39,16 @@ export class S3Storage implements ObjectStorage {
         ServerSideEncryption: env.S3_ENDPOINT ? undefined : "aws:kms",
       }),
     );
+  }
+
+  async get(key: string) {
+    try {
+      const out = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+      return out.Body ? Buffer.from(await out.Body.transformToByteArray()) : null;
+    } catch (err) {
+      if ((err as { name?: string }).name === "NoSuchKey") return null;
+      throw err;
+    }
   }
 
   presignDownload(key: string, fileName: string, ttlSeconds: number) {
@@ -69,6 +81,13 @@ export class LocalStorage implements ObjectStorage {
     const full = this.resolve(key);
     await mkdir(path.dirname(full), { recursive: true });
     await writeFile(full, body);
+  }
+
+  async get(key: string) {
+    return readFile(this.resolve(key)).catch((err: NodeJS.ErrnoException) => {
+      if (err.code === "ENOENT") return null;
+      throw err;
+    });
   }
 
   async presignDownload(key: string, fileName: string, ttlSeconds: number) {

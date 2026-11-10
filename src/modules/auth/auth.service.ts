@@ -19,6 +19,8 @@ export interface UserDto {
   role: "customer" | "admin";
   emailVerified: boolean;
   phone: string | null;
+  /** Relative to the API base (e.g. `/avatars/<id>.webp`); null when none is set. */
+  avatarUrl: string | null;
   createdAt: Date;
 }
 
@@ -29,6 +31,7 @@ export const toUserDto = (u: UserRow): UserDto => ({
   role: u.role,
   emailVerified: u.emailVerifiedAt !== null,
   phone: u.phone,
+  avatarUrl: u.avatarKey ? `/${u.avatarKey}` : null,
   createdAt: u.createdAt,
 });
 
