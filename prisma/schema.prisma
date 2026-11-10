@@ -1,0 +1,454 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  customer
+  admin
+}
+
+enum UserStatus {
+  active
+  suspended
+}
+
+enum ChallengePurpose {
+  checkout
+  document_access
+  email_verification
+  password_reset
+}
+
+enum DocumentType {
+  paystub
+  w2
+  nec1099
+  direct_deposit
+}
+
+enum ProductKind {
+  one_time
+  subscription
+}
+
+enum BillingInterval {
+  month
+}
+
+enum OrderStatus {
+  pending_payment
+  paid
+  failed
+  canceled
+  refunded
+  partially_refunded
+}
+
+enum DocumentStatus {
+  awaiting_payment
+  queued
+  rendering
+  ready
+  failed
+  revoked
+}
+
+enum PaymentStatus {
+  requires_payment
+  processing
+  succeeded
+  failed
+  refunded
+  partially_refunded
+}
+
+enum SubscriptionStatus {
+  incomplete
+  active
+  past_due
+  canceled
+  unpaid
+}
+
+enum ContactStatus {
+  new
+  handled
+}
+
+enum EmailStatus {
+  pending
+  sent
+  failed
+}
+
+enum ActorType {
+  admin
+  customer
+  guest
+  system
+}
+
+enum JobStatus {
+  pending
+  running
+  done
+  failed
+}
+
+/// Emails are stored lowercased by the application (stands in for citext).
+model User {
+  id               String     @id @default(uuid(7)) @db.Uuid
+  email            String     @unique
+  name             String
+  phone            String?
+  passwordHash     String     @map("password_hash")
+  role             Role       @default(customer)
+  status           UserStatus @default(active)
+  emailVerifiedAt  DateTime?  @map("email_verified_at") @db.Timestamptz
+  stripeCustomerId String?    @unique @map("stripe_customer_id")
+  lastLoginAt      DateTime?  @map("last_login_at") @db.Timestamptz
+  createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime   @updatedAt @map("updated_at") @db.Timestamptz
+
+  sessions      RefreshSession[]
+  orders        Order[]
+  subscriptions Subscription[]
+  challenges    VerificationChallenge[]
+
+  @@index([role, status])
+  @@map("users")
+}
+
+model RefreshSession {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  familyId     String    @map("family_id") @db.Uuid
+  tokenHash    String    @unique @map("token_hash")
+  rememberMe   Boolean   @default(false) @map("remember_me")
+  userAgent    String?   @map("user_agent")
+  ip           String?
+  expiresAt    DateTime  @map("expires_at") @db.Timestamptz
+  revokedAt    DateTime? @map("revoked_at") @db.Timestamptz
+  replacedById String?   @map("replaced_by_id") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_sessions")
+}
+
+model VerificationChallenge {
+  id          String           @id @default(uuid(7)) @db.Uuid
+  email       String
+  userId      String?          @map("user_id") @db.Uuid
+  purpose     ChallengePurpose
+  secretHash  String           @map("secret_hash")
+  attempts    Int              @default(0)
+  maxAttempts Int              @default(5) @map("max_attempts")
+  expiresAt   DateTime         @map("expires_at") @db.Timestamptz
+  consumedAt  DateTime?        @map("consumed_at") @db.Timestamptz
+  ip          String?
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([email, purpose, createdAt(sort: Desc)])
+  @@map("verification_challenges")
+}
+
+model Product {
+  id             String           @id @default(uuid(7)) @db.Uuid
+  code           String           @unique
+  documentType   DocumentType?    @map("document_type")
+  kind           ProductKind
+  name           String
+  amountCents    Int              @map("amount_cents")
+  currency       String           @default("usd") @db.Char(3)
+  interval       BillingInterval?
+  creditQuantity Int              @default(1) @map("credit_quantity")
+  isAddon        Boolean          @default(false) @map("is_addon")
+  isActive       Boolean          @default(true) @map("is_active")
+  stripePriceId  String?          @map("stripe_price_id")
+  badge          String?
+  sortOrder      Int              @default(0) @map("sort_order")
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+
+  orderItems    OrderItem[]
+  subscriptions Subscription[]
+
+  @@map("products")
+}
+
+model DocumentTemplate {
+  id           String       @id @default(uuid(7)) @db.Uuid
+  code         String
+  documentType DocumentType @map("document_type")
+  title        String
+  subtitle     String?
+  renderer     String
+  variant      Json?
+  isActive     Boolean      @default(true) @map("is_active")
+  isDefault    Boolean      @default(false) @map("is_default")
+  sortOrder    Int          @default(0) @map("sort_order")
+
+  documents Document[]
+
+  @@unique([documentType, code])
+  @@map("document_templates")
+}
+
+model Order {
+  id              String       @id @default(uuid(7)) @db.Uuid
+  orderNumber     String       @unique @map("order_number")
+  userId          String?      @map("user_id") @db.Uuid
+  email           String
+  emailVerifiedAt DateTime?    @map("email_verified_at") @db.Timestamptz
+  documentType    DocumentType @map("document_type")
+  status          OrderStatus  @default(pending_payment)
+  subtotalCents   Int          @map("subtotal_cents")
+  totalCents      Int          @map("total_cents")
+  currency        String       @default("usd") @db.Char(3)
+  termsAcceptedAt DateTime     @map("terms_accepted_at") @db.Timestamptz
+  idempotencyKey  String       @unique @map("idempotency_key")
+  createdIp       String?      @map("created_ip")
+  paidAt          DateTime?    @map("paid_at") @db.Timestamptz
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+
+  user         User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  items        OrderItem[]
+  documents    Document[]
+  entitlements Entitlement[]
+  payments     Payment[]
+  emails       EmailDelivery[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([email, createdAt(sort: Desc)])
+  @@index([status, createdAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id              String @id @default(uuid(7)) @db.Uuid
+  orderId         String @map("order_id") @db.Uuid
+  productId       String @map("product_id") @db.Uuid
+  productCode     String @map("product_code")
+  name            String
+  quantity        Int
+  unitAmountCents Int    @map("unit_amount_cents")
+  amountCents     Int    @map("amount_cents")
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+model Document {
+  id             String         @id @default(uuid(7)) @db.Uuid
+  documentNumber String         @unique @map("document_number")
+  orderId        String         @map("order_id") @db.Uuid
+  entitlementId  String?        @map("entitlement_id") @db.Uuid
+  templateId     String         @map("template_id") @db.Uuid
+  type           DocumentType
+  title          String
+  employerName   String?        @map("employer_name")
+  recipientName  String?        @map("recipient_name")
+  amountCents    Int?           @map("amount_cents")
+  fileName       String         @map("file_name")
+  formDataEnc    Bytes?         @map("form_data_enc")
+  formDataKeyId  String?        @map("form_data_key_id")
+  schemaVersion  Int            @default(1) @map("schema_version")
+  status         DocumentStatus @default(awaiting_payment)
+  pdfStorageKey  String?        @map("pdf_storage_key")
+  pdfSha256      String?        @map("pdf_sha256")
+  downloadCount  Int            @default(0) @map("download_count")
+  renderedAt     DateTime?      @map("rendered_at") @db.Timestamptz
+  purgedAt       DateTime?      @map("purged_at") @db.Timestamptz
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz
+
+  order       Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  entitlement Entitlement?     @relation(fields: [entitlementId], references: [id], onDelete: SetNull)
+  template    DocumentTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([type, createdAt(sort: Desc)])
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "documents_title_trgm_idx")
+  @@index([employerName(ops: raw("gin_trgm_ops"))], type: Gin, map: "documents_employer_name_trgm_idx")
+  @@index([recipientName(ops: raw("gin_trgm_ops"))], type: Gin, map: "documents_recipient_name_trgm_idx")
+  @@map("documents")
+}
+
+model Entitlement {
+  id           String       @id @default(uuid(7)) @db.Uuid
+  orderId      String       @map("order_id") @db.Uuid
+  documentType DocumentType @map("document_type")
+  creditsTotal Int          @map("credits_total")
+  creditsUsed  Int          @default(0) @map("credits_used")
+  expiresAt    DateTime?    @map("expires_at") @db.Timestamptz
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz
+
+  order     Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  documents Document[]
+
+  @@index([orderId])
+  @@map("entitlements")
+}
+
+model Payment {
+  id                  String        @id @default(uuid(7)) @db.Uuid
+  orderId             String?       @map("order_id") @db.Uuid
+  subscriptionId      String?       @map("subscription_id") @db.Uuid
+  provider            String        @default("stripe")
+  providerPaymentId   String        @map("provider_payment_id")
+  amountCents         Int           @map("amount_cents")
+  amountRefundedCents Int           @default(0) @map("amount_refunded_cents")
+  currency            String        @default("usd") @db.Char(3)
+  status              PaymentStatus @default(requires_payment)
+  cardBrand           String?       @map("card_brand")
+  cardLast4           String?       @map("card_last4")
+  receiptUrl          String?       @map("receipt_url")
+  failureCode         String?       @map("failure_code")
+  createdAt           DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  order        Order?        @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, providerPaymentId])
+  @@index([orderId])
+  @@index([subscriptionId])
+  @@map("payments")
+}
+
+model WebhookEvent {
+  id          String    @id
+  type        String
+  payload     Json?
+  receivedAt  DateTime  @default(now()) @map("received_at") @db.Timestamptz
+  processedAt DateTime? @map("processed_at") @db.Timestamptz
+  error       String?
+
+  @@map("webhook_events")
+}
+
+model Subscription {
+  id                   String             @id @default(uuid(7)) @db.Uuid
+  userId               String             @map("user_id") @db.Uuid
+  productId            String             @map("product_id") @db.Uuid
+  stripeSubscriptionId String             @unique @map("stripe_subscription_id")
+  status               SubscriptionStatus
+  currentPeriodStart   DateTime?          @map("current_period_start") @db.Timestamptz
+  currentPeriodEnd     DateTime?          @map("current_period_end") @db.Timestamptz
+  cancelAtPeriodEnd    Boolean            @default(false) @map("cancel_at_period_end")
+  canceledAt           DateTime?          @map("canceled_at") @db.Timestamptz
+  createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime           @updatedAt @map("updated_at") @db.Timestamptz
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  product  Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+  payments Payment[]
+
+  @@index([userId, status])
+  @@map("subscriptions")
+}
+
+model ContactMessage {
+  id        String        @id @default(uuid(7)) @db.Uuid
+  name      String
+  email     String
+  subject   String
+  message   String
+  status    ContactStatus @default(new)
+  ip        String?
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([status, createdAt])
+  @@map("contact_messages")
+}
+
+model EmailDelivery {
+  id                String      @id @default(uuid(7)) @db.Uuid
+  toEmail           String      @map("to_email")
+  template          String
+  /// Cleared after sending: may hold one-time codes or reset links until then.
+  payload           Json
+  status            EmailStatus @default(pending)
+  attempts          Int         @default(0)
+  providerMessageId String?     @map("provider_message_id")
+  lastError         String?     @map("last_error")
+  relatedOrderId    String?     @map("related_order_id") @db.Uuid
+  createdAt         DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  sentAt            DateTime?   @map("sent_at") @db.Timestamptz
+
+  relatedOrder Order? @relation(fields: [relatedOrderId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@map("email_deliveries")
+}
+
+model AuditLog {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  actorType  ActorType @map("actor_type")
+  actorId    String?   @map("actor_id") @db.Uuid
+  action     String
+  targetType String?   @map("target_type")
+  targetId   String?   @map("target_id")
+  metadata   Json?
+  ip         String?
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([createdAt(sort: Desc)])
+  @@index([targetType, targetId])
+  @@index([actorId])
+  @@map("audit_logs")
+}
+
+model Job {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  type        String
+  payload     Json
+  status      JobStatus @default(pending)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3) @map("max_attempts")
+  runAt       DateTime  @default(now()) @map("run_at") @db.Timestamptz
+  lockedAt    DateTime? @map("locked_at") @db.Timestamptz
+  lockedBy    String?   @map("locked_by")
+  lastError   String?   @map("last_error")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([status, runAt])
+  @@map("jobs")
+}
+
+model IdempotencyKey {
+  key         String   @id
+  scope       String
+  requestHash String   @map("request_hash")
+  /// Null while the first request is still in flight.
+  response    Json?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  expiresAt   DateTime @map("expires_at") @db.Timestamptz
+
+  @@index([expiresAt])
+  @@map("idempotency_keys")
+}
+
+model RateLimitCounter {
+  key         String
+  windowStart DateTime @map("window_start") @db.Timestamptz
+  count       Int      @default(0)
+
+  @@id([key, windowStart])
+  @@map("rate_limit_counters")
+}
