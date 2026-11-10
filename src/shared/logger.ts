@@ -37,4 +37,8 @@ export const logger = pino({
     ],
     censor: "[REDACTED]",
   },
+  // Readable multi-line output in development; JSON lines everywhere else so log shippers can parse them.
+  ...(env.NODE_ENV === "development"
+    ? { transport: { target: "pino-pretty", options: { translateTime: "SYS:HH:MM:ss.l", ignore: "pid,hostname,req,res,responseTime" } } }
+    : {}),
 });

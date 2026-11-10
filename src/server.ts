@@ -13,7 +13,7 @@ import { maintenanceJobs } from "./jobs/retention.job.ts";
 const container = createContainer();
 const { services: s, repositories: r } = container;
 
-const server = createApp(container).listen(env.PORT, () => logger.info({ port: env.PORT }, "API listening"));
+const server = createApp(container).listen(env.PORT, () => logger.info({ service: "paystubsusa-api", env: env.NODE_ENV, port: env.PORT }, "Server started"));
 
 const runner = env.JOBS_ENABLED
   ? new JobRunner(

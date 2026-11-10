@@ -35,7 +35,15 @@ export function createApp(c: Container) {
   app.disable("x-powered-by");
 
   app.use(requestId);
-  app.use(pinoHttp({ logger, genReqId: (req) => (req as express.Request).id, autoLogging: { ignore: (req) => req.url === "/healthz" } }));
+  app.use(
+    pinoHttp({
+      logger,
+      genReqId: (req) => (req as express.Request).id,
+      autoLogging: { ignore: (req) => req.url === "/healthz" },
+      customLogLevel: (_req, res, err) => (err || res.statusCode >= 500 ? "error" : res.statusCode >= 400 ? "warn" : "info"),
+      customSuccessMessage: (req, res, ms) => `${req.method} ${res.statusCode} ${(req as express.Request).originalUrl} ${ms} ms`,
+    }),
+  );
   app.use(helmet());
   app.use(cors({ origin: env.CORS_ORIGINS, credentials: true, maxAge: 600 }));
 

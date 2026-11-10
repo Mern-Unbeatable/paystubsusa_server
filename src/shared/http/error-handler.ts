@@ -1,15 +1,22 @@
 import type { ErrorRequestHandler, RequestHandler } from "express";
 import { ZodError } from "zod";
-import { AppError } from "./app-error.ts";
+import { AppError, notFound } from "./app-error.ts";
 import { zodToFieldErrors } from "../middleware/validate.ts";
 import { logger } from "../logger.ts";
+import { env } from "../../config/env.ts";
 
-export const notFoundHandler: RequestHandler = (req, res) => {
-  res.status(404).json({ message: "Route not found", code: "ROUTE_NOT_FOUND", requestId: req.id });
+export const notFoundHandler: RequestHandler = (req, _res, next) => {
+  next(notFound("ROUTE_NOT_FOUND", `Route not found: ${req.method} ${req.path}`));
 };
 
 export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   const requestId = req.id;
+
+  // Client errors are expected; only surface them (with stack) while developing.
+  const status = err instanceof ZodError ? 422 : err instanceof AppError ? err.status : typeof err?.status === "number" ? err.status : 500;
+  if (env.NODE_ENV === "development" && status < 500) {
+    logger.warn({ err, method: req.method, url: req.originalUrl, requestId }, "Handled request error");
+  }
 
   if (err instanceof ZodError) {
     res.status(422).json({
@@ -36,7 +43,6 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   }
 
   // body-parser errors (malformed JSON, payload too large) carry a status and `expose`.
-  const status = typeof err?.status === "number" ? err.status : 500;
   if (status < 500 && err?.expose) {
     res.status(status).json({
       message: status === 413 ? "Request body too large" : "Malformed request body",
