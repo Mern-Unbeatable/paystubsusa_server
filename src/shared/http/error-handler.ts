@@ -15,7 +15,8 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   // Client errors are expected; only surface them (with stack) while developing.
   const status = err instanceof ZodError ? 422 : err instanceof AppError ? err.status : typeof err?.status === "number" ? err.status : 500;
   if (env.NODE_ENV === "development" && status < 500) {
-    logger.warn({ err, method: req.method, url: req.originalUrl, requestId }, "Handled request error");
+    // After "finish" so it prints below pino-http's request line (registered earlier, so it runs first).
+    res.once("finish", () => logger.warn({ err, method: req.method, url: req.originalUrl, requestId }, "Handled request error"));
   }
 
   if (err instanceof ZodError) {
