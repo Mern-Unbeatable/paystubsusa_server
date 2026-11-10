@@ -53,8 +53,18 @@ export const emailTemplates = {
 
   password_reset: (p: { resetUrl: string; name: string }): Rendered => ({
     subject: "Reset your password",
-    text: `Hi ${p.name},\n\nReset your password with this link (valid for 30 minutes):\n${p.resetUrl}\n\nIf you didn't request this, ignore this email.`,
-    html: layout("Reset your password", `<p>Hi ${esc(p.name)},</p><p><a href="${esc(p.resetUrl)}">Reset your password</a> (valid for 30 minutes).</p><p>If you didn't request this, ignore this email.</p>`),
+    text:
+      `Hi ${p.name},\n\nWe received a request to reset the password for your Paystubs USA account. Open this link to choose a new password:\n\n${p.resetUrl}\n\n` +
+      `If you did not request a password reset, please disregard this email. The link will remain active for 30 minutes.`,
+    html: cardLayout(
+      "Reset your Paystubs USA password",
+      `<p style="margin:0 0 24px;font-size:15px;line-height:22px;color:#1f2937">Hi ${esc(p.name)}, we received a request to reset the password for your Paystubs USA account. Click the button below to choose a new password.</p>` +
+        `<table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto"><tr><td style="background:#092258;border-radius:10px">` +
+        `<a href="${esc(p.resetUrl)}" target="_blank" style="display:inline-block;padding:14px 32px;font-size:16px;font-weight:700;color:#ffffff;text-decoration:none">Reset Password</a></td></tr></table>` +
+        `<p style="margin:24px 0 8px;font-size:13px;color:#6b7280">If the button doesn't work, copy and paste this link into your browser:</p>` +
+        `<p style="margin:0;padding:12px 16px;background:#eff1f0;border-radius:10px;font-size:13px;line-height:19px;word-break:break-all"><a href="${esc(p.resetUrl)}" target="_blank" style="color:#092258">${esc(p.resetUrl)}</a></p>` +
+        `<p style="margin:24px 0 0;font-size:14px;line-height:21px;color:#6b7280">If you did not request a password reset, please disregard this email. The link will remain active for 30 minutes.</p>`,
+    ),
     tag: "password-reset",
   }),
 
