@@ -9,6 +9,21 @@ const layout = (title: string, bodyHtml: string) =>
   `<!doctype html><html><body style="font-family:Arial,sans-serif;color:#111;max-width:560px;margin:auto">` +
   `<h2>${esc(title)}</h2>${bodyHtml}<p style="color:#666;font-size:12px">Paystubs USA</p></body></html>`;
 
+/** 2076×758 with wide transparent side margins; keep the <img> at that ratio. */
+const LOGO_URL = "https://raw.githubusercontent.com/Mern-Unbeatable/paystubsusa_frontend/refs/heads/main/src/assets/logo.png";
+
+/** Centered card; tables and inline styles only, since email clients ignore stylesheets and flexbox. */
+const cardLayout = (title: string, bodyHtml: string) =>
+  `<!doctype html><html><body style="margin:0;padding:0;background:#f4f4f7">` +
+  `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 12px"><tr><td align="center">` +
+  `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;font-family:Arial,Helvetica,sans-serif;text-align:center">` +
+  `<tr><td style="padding:40px 40px 0"><img src="${LOGO_URL}" width="200" height="73" alt="Paystubs USA" style="display:inline-block;width:200px;max-width:100%;height:auto;border:0"></td></tr>` +
+  `<tr><td style="padding:40px 40px 0"><h1 style="margin:0 0 16px;font-size:22px;color:#111827">${esc(title)}</h1>${bodyHtml}</td></tr>` +
+  `<tr><td style="padding:40px 40px 32px"><hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 24px">` +
+  `<p style="margin:0 0 12px;font-size:14px;color:#6b7280">Paystubs USA, professional paystubs and tax forms in minutes.</p>` +
+  `<p style="margin:0;font-size:12px;color:#9ca3af">&copy; ${new Date().getFullYear()} Paystubs USA. All rights reserved.</p></td></tr>` +
+  `</table></td></tr></table></body></html>`;
+
 type Rendered = Omit<OutgoingEmail, "to">;
 
 export const emailTemplates = {
@@ -23,9 +38,16 @@ export const emailTemplates = {
   },
 
   email_verification: (p: { code: string; name: string }): Rendered => ({
-    subject: "Verify your email address",
-    text: `Hi ${p.name},\n\nYour email verification code is ${p.code}. It expires in 10 minutes.`,
-    html: layout("Verify your email", `<p>Hi ${esc(p.name)},</p><p>Your email verification code is <b style="font-size:22px;letter-spacing:4px">${esc(p.code)}</b>. It expires in 10 minutes.</p>`),
+    subject: `${p.code} is your Paystubs USA verification code`,
+    text:
+      `Hi ${p.name},\n\nWe have received a sign-up attempt with the following code. Enter it in the browser window where you started signing up for Paystubs USA:\n\n${p.code}\n\n` +
+      `If you did not attempt to sign up but received this email, please disregard it. The code will remain active for 10 minutes.`,
+    html: cardLayout(
+      "Verify your Paystubs USA sign-up",
+      `<p style="margin:0 0 24px;font-size:15px;line-height:22px;color:#1f2937">Hi ${esc(p.name)}, we have received a sign-up attempt with the following code. Please enter it in the browser window where you started signing up for Paystubs USA.</p>` +
+        `<div style="background:#eff1f0;border-radius:12px;padding:28px 16px;font-size:34px;font-weight:700;letter-spacing:6px;color:#111827">${esc(p.code)}</div>` +
+        `<p style="margin:24px 0 0;font-size:14px;line-height:21px;color:#6b7280">If you did not attempt to sign up but received this email, please disregard it. The code will remain active for 10 minutes.</p>`,
+    ),
     tag: "email-verification",
   }),
 
