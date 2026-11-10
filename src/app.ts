@@ -4,7 +4,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import { pinoHttp } from "pino-http";
 import { z } from "zod";
-import { env, isProduction } from "./config/env.ts";
+import { env } from "./config/env.ts";
 import type { Container } from "./container.ts";
 import { LocalStorage } from "./integrations/storage.ts";
 import { logger } from "./shared/logger.ts";
@@ -71,7 +71,7 @@ export function createApp(c: Container) {
   api.use(adminRoutes(c.controllers.admin, users, idempotency));
 
   const storage = c.integrations.storage;
-  if (!isProduction && storage instanceof LocalStorage) {
+  if (storage instanceof LocalStorage) {
     api.get("/local-files", async (req, res) => {
       const q = parse(localFileQuery, req.query);
       const file = await storage.read(q.key, q.name, q.exp, q.sig).catch(() => null);

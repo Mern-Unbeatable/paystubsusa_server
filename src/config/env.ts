@@ -34,16 +34,13 @@ const schema = z
     STRIPE_SECRET_KEY: z.string().startsWith("sk_"),
     STRIPE_WEBHOOK_SECRET: z.string().startsWith("whsec_"),
 
-    STORAGE_DRIVER: z.enum(["s3", "local"]).default("local"),
-    S3_BUCKET: z.string().optional(),
-    S3_REGION: z.string().default("us-east-1"),
-    S3_ENDPOINT: z.string().url().optional(),
-    S3_ACCESS_KEY_ID: z.string().optional(),
-    S3_SECRET_ACCESS_KEY: z.string().optional(),
+    /** Public origin of this API, used in signed file-download links; defaults to localhost:PORT outside production. */
+    PUBLIC_API_URL: z.string().url().optional(),
+
+    STORAGE_DRIVER: z.enum(["local"]).default("local"),
     LOCAL_STORAGE_DIR: z.string().default(".storage"),
 
-    MAIL_DRIVER: z.enum(["postmark", "smtp", "log"]).default("log"),
-    POSTMARK_SERVER_TOKEN: z.string().optional(),
+    MAIL_DRIVER: z.enum(["smtp", "log"]).default("log"),
     SMTP_HOST: z.string().optional(),
     SMTP_PORT: z.coerce.number().int().positive().default(587),
     SMTP_SECURE: bool.default(false),
@@ -61,20 +58,18 @@ const schema = z
     SCHEDULER_ENABLED: bool.default(true),
   })
   .superRefine((env, ctx) => {
-    if (env.STORAGE_DRIVER === "s3" && !env.S3_BUCKET) {
-      ctx.addIssue({ code: "custom", path: ["S3_BUCKET"], message: "required when STORAGE_DRIVER=s3" });
-    }
-    if (env.MAIL_DRIVER === "postmark" && !env.POSTMARK_SERVER_TOKEN) {
-      ctx.addIssue({ code: "custom", path: ["POSTMARK_SERVER_TOKEN"], message: "required when MAIL_DRIVER=postmark" });
-    }
     if (env.MAIL_DRIVER === "smtp") {
       for (const key of ["SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD"] as const) {
         if (!env[key]) ctx.addIssue({ code: "custom", path: [key], message: "required when MAIL_DRIVER=smtp" });
       }
+      if (env.MAIL_FROM.endsWith(".local")) {
+        ctx.addIssue({ code: "custom", path: ["MAIL_FROM"], message: "set the sender address when MAIL_DRIVER=smtp (for Gmail, the SMTP_USER address)" });
+      }
     }
     if (env.NODE_ENV === "production") {
-      if (env.STORAGE_DRIVER !== "s3") ctx.addIssue({ code: "custom", path: ["STORAGE_DRIVER"], message: "must be s3 in production" });
-      if (env.MAIL_DRIVER !== "postmark") ctx.addIssue({ code: "custom", path: ["MAIL_DRIVER"], message: "must be postmark in production" });
+      // `log` only writes files, so in production no email would ever reach a customer.
+      if (env.MAIL_DRIVER !== "smtp") ctx.addIssue({ code: "custom", path: ["MAIL_DRIVER"], message: "must be smtp in production" });
+      if (!env.PUBLIC_API_URL) ctx.addIssue({ code: "custom", path: ["PUBLIC_API_URL"], message: "required in production" });
       if (env.COOKIE_SECURE === false) ctx.addIssue({ code: "custom", path: ["COOKIE_SECURE"], message: "cannot be false in production" });
     }
   });
@@ -93,3 +88,4 @@ function load(): Env {
 export const env = load();
 export const isProduction = env.NODE_ENV === "production";
 export const cookieSecure = env.COOKIE_SECURE ?? isProduction;
+export const publicApiUrl = (env.PUBLIC_API_URL ?? `http://localhost:${env.PORT}`).replace(/\/+$/, "");
