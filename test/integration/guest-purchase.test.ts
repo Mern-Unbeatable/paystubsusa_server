@@ -104,7 +104,8 @@ describe.skipIf(!hasDatabase)("guest purchase → webhook → render → downloa
       .send({ entitlementId, templateId, formData: { ...paystubForm(), payDate: "2026-10-31" } })
       .expect(201);
     expect(res.body.data.creditsRemaining).toBe(3);
-    const other = await h.guestToken("eve@example.com");
+    // Not eve: a second code for the same email within 30 s is (correctly) RESEND_COOLDOWN.
+    const other = await h.guestToken("mallory@example.com");
     await request(h.app).post("/api/v1/documents").set("Authorization", `Guest ${other}`).send({ entitlementId, templateId, formData: paystubForm() }).expect(404);
   });
 
