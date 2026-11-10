@@ -42,8 +42,13 @@ const schema = z
     S3_SECRET_ACCESS_KEY: z.string().optional(),
     LOCAL_STORAGE_DIR: z.string().default(".storage"),
 
-    MAIL_DRIVER: z.enum(["postmark", "log"]).default("log"),
+    MAIL_DRIVER: z.enum(["postmark", "smtp", "log"]).default("log"),
     POSTMARK_SERVER_TOKEN: z.string().optional(),
+    SMTP_HOST: z.string().optional(),
+    SMTP_PORT: z.coerce.number().int().positive().default(587),
+    SMTP_SECURE: bool.default(false),
+    SMTP_USER: z.string().optional(),
+    SMTP_PASSWORD: z.string().optional(),
     MAIL_FROM: z.string().email().default("no-reply@paystubsusa.local"),
     SUPPORT_EMAIL: z.string().email().default("support@paystubsusa.local"),
     LOCAL_MAIL_DIR: z.string().default(".mail"),
@@ -61,6 +66,11 @@ const schema = z
     }
     if (env.MAIL_DRIVER === "postmark" && !env.POSTMARK_SERVER_TOKEN) {
       ctx.addIssue({ code: "custom", path: ["POSTMARK_SERVER_TOKEN"], message: "required when MAIL_DRIVER=postmark" });
+    }
+    if (env.MAIL_DRIVER === "smtp") {
+      for (const key of ["SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD"] as const) {
+        if (!env[key]) ctx.addIssue({ code: "custom", path: [key], message: "required when MAIL_DRIVER=smtp" });
+      }
     }
     if (env.NODE_ENV === "production") {
       if (env.STORAGE_DRIVER !== "s3") ctx.addIssue({ code: "custom", path: ["STORAGE_DRIVER"], message: "must be s3 in production" });

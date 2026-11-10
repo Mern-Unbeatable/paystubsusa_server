@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import nodemailer from "nodemailer";
 import { ServerClient } from "postmark";
 import { env } from "../config/env.ts";
 
@@ -31,6 +32,26 @@ export class PostmarkMailer implements Mailer {
     });
     if (result.ErrorCode !== 0) throw new Error(`Postmark error ${result.ErrorCode}: ${result.Message}`);
     return { providerMessageId: result.MessageID };
+  }
+}
+
+export class SmtpMailer implements Mailer {
+  private readonly transport = nodemailer.createTransport({
+    host: env.SMTP_HOST,
+    port: env.SMTP_PORT,
+    secure: env.SMTP_SECURE,
+    auth: { user: env.SMTP_USER, pass: env.SMTP_PASSWORD },
+  });
+
+  async send(email: OutgoingEmail) {
+    const info = await this.transport.sendMail({
+      from: env.MAIL_FROM,
+      to: email.to,
+      subject: email.subject,
+      text: email.text,
+      html: email.html,
+    });
+    return { providerMessageId: info.messageId };
   }
 }
 

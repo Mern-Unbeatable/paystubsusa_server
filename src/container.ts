@@ -5,7 +5,7 @@ import { PrismaIdempotencyRepository } from "./shared/db/prisma-idempotency.repo
 import { PrismaJobRepository } from "./shared/jobs/prisma-job.repository.ts";
 import { DbRateLimiter } from "./shared/rate-limit/db-rate-limiter.ts";
 import { StripeGateway, type PaymentGateway } from "./integrations/stripe.ts";
-import { FileMailer, PostmarkMailer, type Mailer } from "./integrations/mailer.ts";
+import { FileMailer, PostmarkMailer, SmtpMailer, type Mailer } from "./integrations/mailer.ts";
 import { LocalStorage, S3Storage, type ObjectStorage } from "./integrations/storage.ts";
 import { PlaywrightRenderer, type DocumentRenderer } from "./integrations/renderer.ts";
 import { AuditService, PrismaAuditLogRepository } from "./modules/audit/index.ts";
@@ -40,7 +40,9 @@ export interface Integrations {
 export function createContainer(overrides: Partial<Integrations> = {}) {
   const integrations: Integrations = {
     gateway: overrides.gateway ?? new StripeGateway(),
-    mailer: overrides.mailer ?? (env.MAIL_DRIVER === "postmark" ? new PostmarkMailer() : new FileMailer()),
+    mailer:
+      overrides.mailer ??
+      (env.MAIL_DRIVER === "postmark" ? new PostmarkMailer() : env.MAIL_DRIVER === "smtp" ? new SmtpMailer() : new FileMailer()),
     storage: overrides.storage ?? (env.STORAGE_DRIVER === "s3" ? new S3Storage() : new LocalStorage()),
     renderer: overrides.renderer ?? new PlaywrightRenderer(),
   };
