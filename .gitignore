@@ -1,6 +1,10 @@
 node_modules/
 src/generated/
 .storage/
+temp_auto_push.bat
 .mail/
 coverage/
 config.bat
+
+.gitignore
+branch_structure.json
