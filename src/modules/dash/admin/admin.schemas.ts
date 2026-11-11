@@ -1,10 +1,14 @@
 import { z } from "zod";
 import { paginationQuery, sortQuery } from "../../../shared/http/pagination.ts";
-import { documentTypeEnum } from "../../catalog/index.ts";
+import { documentTypeEnum, templateVariantField } from "../../catalog/index.ts";
 import { orderStatusEnum } from "../../orders/index.ts";
 
 const q = z.string().trim().max(100).optional();
 const dateFilter = z.coerce.date().optional();
+const activeStatus = z
+  .enum(["active", "inactive"])
+  .optional()
+  .transform((s) => (s === undefined ? undefined : s === "active"));
 
 export const idParams = z.object({ id: z.uuid() });
 
@@ -53,10 +57,7 @@ export const adminProductsQuery = z.object({
   q,
   kind: z.enum(["one_time", "subscription"]).optional(),
   documentType: documentTypeEnum.optional(),
-  status: z
-    .enum(["active", "inactive"])
-    .optional()
-    .transform((s) => (s === undefined ? undefined : s === "active")),
+  status: activeStatus,
 });
 
 const productName = z.string().trim().min(1).max(100);
@@ -88,16 +89,40 @@ export const updateProductBody = z
   .strict()
   .refine((b) => Object.values(b).some((v) => v !== undefined), { error: "Nothing to update" });
 
-export const adminTemplatesQuery = z.object({ documentType: documentTypeEnum.optional() });
+export const adminTemplatesQuery = z.object({
+  ...paginationQuery,
+  q,
+  documentType: documentTypeEnum.optional(),
+  status: activeStatus,
+});
+
+const templateTitle = z.string().trim().min(1).max(100);
+const templateSubtitle = z.string().trim().max(200).nullable().transform((s) => s || null);
+const templateSortOrder = z.number().int().min(0).max(10_000);
+
+export const createTemplateBody = z
+  .object({
+    code: z.string().trim().regex(/^[a-z0-9][a-z0-9-]{1,31}$/, { error: "Use 2–32 lowercase letters, digits or hyphens" }),
+    documentType: documentTypeEnum,
+    renderer: z.string().trim().min(1).max(64),
+    variant: templateVariantField.nullable().default(null),
+    title: templateTitle,
+    subtitle: templateSubtitle.default(null),
+    sortOrder: templateSortOrder.default(0),
+    isActive: z.boolean().default(true),
+  })
+  .strict();
 
 export const updateTemplateBody = z
   .object({
-    title: z.string().trim().min(1).max(100).optional(),
-    subtitle: z.string().trim().max(200).nullable().optional(),
+    title: templateTitle.optional(),
+    subtitle: templateSubtitle.optional(),
     isActive: z.boolean().optional(),
-    sortOrder: z.number().int().min(0).max(10_000).optional(),
+    sortOrder: templateSortOrder.optional(),
+    variant: templateVariantField.optional(),
   })
-  .strict();
+  .strict()
+  .refine((b) => Object.values(b).some((v) => v !== undefined), { error: "Nothing to update" });
 
 export const auditLogsQuery = z.object({
   ...paginationQuery,

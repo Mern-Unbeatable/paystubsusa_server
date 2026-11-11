@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CatalogService, type ProductRepository, type ProductRow, type TemplateRepository } from "../../src/modules/catalog/index.ts";
+import type { ObjectStorage } from "../../src/integrations/storage.ts";
 
 const product = (p: Partial<ProductRow> & Pick<ProductRow, "code" | "amountCents">): ProductRow => ({
   id: p.code,
@@ -28,7 +29,7 @@ const catalog = [
 ];
 
 const products = { findByCodes: async (codes: string[]) => catalog.filter((p) => codes.includes(p.code)) } as unknown as ProductRepository;
-const service = new CatalogService(products, {} as TemplateRepository);
+const service = new CatalogService(products, {} as TemplateRepository, {} as ObjectStorage);
 
 describe("CatalogService.quote", () => {
   it("prices a 3-pack plus 2 additional from the database ($24.99 + 2 × $7.99)", async () => {

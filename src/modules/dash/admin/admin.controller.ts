@@ -3,6 +3,7 @@ import { parse } from "../../../shared/middleware/validate.ts";
 import { userPrincipal } from "../../../shared/middleware/require-role.ts";
 import type { AuditService } from "../../audit/index.ts";
 import { requestContext } from "../../auth/index.ts";
+import { invalidPreview } from "../../catalog/index.ts";
 import type { DocumentsService } from "../../documents/index.ts";
 import type { OrdersService } from "../../orders/index.ts";
 import { adminListPaymentsQuery, type PaymentsService } from "../../payments/index.ts";
@@ -18,6 +19,7 @@ import {
   adminTemplatesQuery,
   auditLogsQuery,
   createProductBody,
+  createTemplateBody,
   customersQuery,
   dashboardQuery,
   idParams,
@@ -151,17 +153,42 @@ export class AdminController {
   };
 
   listTemplates = async (req: Request, res: Response) => {
-    const { documentType } = parse(adminTemplatesQuery, req.query);
-    res.json({ data: await this.d.ops.listTemplates(documentType) });
+    const { page, pageSize, status, ...filter } = parse(adminTemplatesQuery, req.query);
+    res.json(await this.d.ops.listTemplates({ ...filter, isActive: status }, { page, pageSize }));
+  };
+
+  getTemplate = async (req: Request, res: Response) => {
+    res.json({ data: await this.d.ops.getTemplate(id(req)) });
+  };
+
+  createTemplate = async (req: Request, res: Response) => {
+    const body = parse(createTemplateBody, req.body);
+    res.status(201).json({ data: await this.d.ops.createTemplate(userPrincipal(req), body, requestContext(req)) });
   };
 
   updateTemplate = async (req: Request, res: Response) => {
+    const templateId = id(req);
     const body = parse(updateTemplateBody, req.body);
-    res.json({ data: await this.d.ops.updateTemplate(userPrincipal(req), id(req), body, requestContext(req)) });
+    res.json({ data: await this.d.ops.updateTemplate(userPrincipal(req), templateId, body, requestContext(req)) });
   };
 
   setDefaultTemplate = async (req: Request, res: Response) => {
     res.json({ data: await this.d.ops.setDefaultTemplate(userPrincipal(req), id(req), requestContext(req)) });
+  };
+
+  deleteTemplate = async (req: Request, res: Response) => {
+    await this.d.ops.deleteTemplate(userPrincipal(req), id(req), requestContext(req));
+    res.status(204).end();
+  };
+
+  uploadTemplatePreview = async (req: Request, res: Response) => {
+    const templateId = id(req);
+    if (!req.file) throw invalidPreview("Choose an image to upload");
+    res.json({ data: await this.d.ops.setTemplatePreview(userPrincipal(req), templateId, req.file.buffer, requestContext(req)) });
+  };
+
+  removeTemplatePreview = async (req: Request, res: Response) => {
+    res.json({ data: await this.d.ops.removeTemplatePreview(userPrincipal(req), id(req), requestContext(req)) });
   };
 
   listContactMessages = async (req: Request, res: Response) => {

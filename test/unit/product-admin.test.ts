@@ -6,6 +6,7 @@ import {
   type ProductWithUsage,
   type TemplateRepository,
 } from "../../src/modules/catalog/index.ts";
+import type { ObjectStorage } from "../../src/integrations/storage.ts";
 
 const row = (code: string, usage = { orderItems: 0, subscriptions: 0 }): ProductWithUsage => ({
   id: `id-${code}`,
@@ -44,7 +45,7 @@ function setup(rows: ProductWithUsage[], { deleteResult = true, createResult = t
     create: vi.fn(async (p: NewProduct) => (createResult ? { ...row(p.code), ...p } : null)),
     delete: vi.fn(async () => deleteResult),
   };
-  return { repo, service: new CatalogService(repo as unknown as ProductRepository, {} as TemplateRepository) };
+  return { repo, service: new CatalogService(repo as unknown as ProductRepository, {} as TemplateRepository, {} as ObjectStorage) };
 }
 
 describe("CatalogService admin product rules", () => {

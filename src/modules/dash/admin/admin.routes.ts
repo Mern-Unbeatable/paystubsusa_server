@@ -2,8 +2,12 @@ import { Router } from "express";
 import type { IdempotencyRepository } from "../../../shared/db/idempotency.repository.ts";
 import { idempotency } from "../../../shared/middleware/idempotency.ts";
 import { requireFreshAdmin, requirePrincipal } from "../../../shared/middleware/require-role.ts";
+import { singleImageUpload } from "../../../shared/http/image-upload.ts";
 import type { UserRepository } from "../../auth/index.ts";
+import { TEMPLATE_PREVIEW_MAX_BYTES, invalidPreview } from "../../catalog/index.ts";
 import type { AdminController } from "./admin.controller.ts";
+
+const parsePreview = singleImageUpload("image", TEMPLATE_PREVIEW_MAX_BYTES, invalidPreview);
 
 export function adminRoutes(c: AdminController, users: UserRepository, idempotencyRepo: IdempotencyRepository) {
   const router = Router();
@@ -40,8 +44,14 @@ export function adminRoutes(c: AdminController, users: UserRepository, idempoten
   router.delete("/admin/products/:code", fresh, c.deleteProduct);
 
   router.get("/admin/templates", c.listTemplates);
+  router.post("/admin/templates", fresh, c.createTemplate);
+  router.get("/admin/templates/:id", c.getTemplate);
   router.patch("/admin/templates/:id", fresh, c.updateTemplate);
+  router.delete("/admin/templates/:id", fresh, c.deleteTemplate);
   router.post("/admin/templates/:id/default", fresh, c.setDefaultTemplate);
+  // Auth and the fresh-role check run before multer reads the body.
+  router.put("/admin/templates/:id/preview", fresh, parsePreview, c.uploadTemplatePreview);
+  router.delete("/admin/templates/:id/preview", fresh, c.removeTemplatePreview);
 
   router.get("/admin/contact-messages", c.listContactMessages);
   router.patch("/admin/contact-messages/:id", fresh, c.updateContactMessage);

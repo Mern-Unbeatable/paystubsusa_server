@@ -1,4 +1,3 @@
-import type { DocumentType } from "../../../generated/prisma/enums.ts";
 import type { TransactionManager } from "../../../shared/db/transaction.ts";
 import { notFound } from "../../../shared/http/app-error.ts";
 import type { Principal, RequestContext } from "../../../shared/types.ts";
@@ -7,14 +6,20 @@ import { actorOf, type AuditService } from "../../audit/index.ts";
 import type { UserRepository } from "../../auth/index.ts";
 import {
   SYSTEM_PRODUCT_CODES,
+  canDeleteTemplate,
+  canEditTemplateLayout,
+  isSystemTemplate,
   toProductDto,
   toTemplateDto,
   type CatalogService,
   type NewProduct,
+  type NewTemplate,
   type ProductFilter,
   type ProductRow,
   type ProductWithUsage,
-  type TemplateRow,
+  type TemplateFilter,
+  type TemplateUpdate,
+  type TemplateWithUsage,
 } from "../../catalog/index.ts";
 import { toPage, type PageRequest } from "../../../shared/http/pagination.ts";
 import type { DocumentsService } from "../../documents/index.ts";
@@ -46,7 +51,16 @@ const toAdminProductWithUsage = (p: ProductWithUsage) => ({
   usage: p.usage,
   canDelete: !SYSTEM_PRODUCT_CODES.has(p.code) && p.usage.orderItems === 0 && p.usage.subscriptions === 0,
 });
-const toAdminTemplate = (t: TemplateRow) => ({ ...toTemplateDto(t), isActive: t.isActive });
+const toAdminTemplate = (t: TemplateWithUsage) => ({
+  ...toTemplateDto(t),
+  isActive: t.isActive,
+  isSystem: isSystemTemplate(t),
+  createdAt: t.createdAt,
+  updatedAt: t.updatedAt,
+  usage: t.usage,
+  canDelete: canDeleteTemplate(t),
+  canEditLayout: canEditTemplateLayout(t),
+});
 
 /** Admin mutations and detail views that span several modules. Every mutation is audited. */
 export class AdminOperationsService {
@@ -181,19 +195,72 @@ export class AdminOperationsService {
     return this.getProduct(updated.code);
   }
 
-  async listTemplates(documentType?: DocumentType) {
-    return (await this.d.catalog.listAllTemplates(documentType)).map(toAdminTemplate);
+  async listTemplates(filter: TemplateFilter, page: PageRequest) {
+    const { items, total } = await this.d.catalog.searchTemplates(filter, page);
+    return toPage(items.map(toAdminTemplate), total, page);
   }
 
-  async updateTemplate(principal: Principal, id: string, input: { title?: string; subtitle?: string | null; isActive?: boolean; sortOrder?: number }, ctx: RequestContext) {
-    const updated = await this.d.catalog.updateTemplate(id, input);
-    await this.d.audit.record({ ...actorOf(principal), action: "template.update", targetType: "template", targetId: id, metadata: input, ip: ctx.ip });
-    return toAdminTemplate(updated);
+  async getTemplate(id: string) {
+    return toAdminTemplate(await this.d.catalog.findTemplateWithUsage(id));
+  }
+
+  async createTemplate(principal: Principal, input: NewTemplate, ctx: RequestContext) {
+    const created = await this.d.catalog.createTemplate(input);
+    await this.d.audit.record({
+      ...actorOf(principal),
+      action: "template.create",
+      targetType: "template",
+      targetId: created.id,
+      metadata: { after: input },
+      ip: ctx.ip,
+    });
+    return this.getTemplate(created.id);
+  }
+
+  async updateTemplate(principal: Principal, id: string, input: Omit<TemplateUpdate, "previewImageKey">, ctx: RequestContext) {
+    const before = await this.d.catalog.findTemplate(id);
+    await this.d.catalog.updateTemplate(id, input);
+    await this.d.audit.record({
+      ...actorOf(principal),
+      action: "template.update",
+      targetType: "template",
+      targetId: id,
+      metadata: {
+        before: { title: before.title, subtitle: before.subtitle, isActive: before.isActive, sortOrder: before.sortOrder, variant: before.variant },
+        after: input,
+      },
+      ip: ctx.ip,
+    });
+    return this.getTemplate(id);
   }
 
   async setDefaultTemplate(principal: Principal, id: string, ctx: RequestContext) {
-    const updated = await this.d.catalog.setDefaultTemplate(id);
+    await this.d.catalog.setDefaultTemplate(id);
     await this.d.audit.record({ ...actorOf(principal), action: "template.set_default", targetType: "template", targetId: id, ip: ctx.ip });
-    return toAdminTemplate(updated);
+    return this.getTemplate(id);
+  }
+
+  async deleteTemplate(principal: Principal, id: string, ctx: RequestContext) {
+    const deleted = await this.d.catalog.deleteTemplate(id);
+    await this.d.audit.record({
+      ...actorOf(principal),
+      action: "template.delete",
+      targetType: "template",
+      targetId: id,
+      metadata: { before: { code: deleted.code, documentType: deleted.documentType, title: deleted.title, renderer: deleted.renderer } },
+      ip: ctx.ip,
+    });
+  }
+
+  async setTemplatePreview(principal: Principal, id: string, image: Buffer, ctx: RequestContext) {
+    await this.d.catalog.setTemplatePreview(id, image);
+    await this.d.audit.record({ ...actorOf(principal), action: "template.preview_update", targetType: "template", targetId: id, ip: ctx.ip });
+    return this.getTemplate(id);
+  }
+
+  async removeTemplatePreview(principal: Principal, id: string, ctx: RequestContext) {
+    await this.d.catalog.removeTemplatePreview(id);
+    await this.d.audit.record({ ...actorOf(principal), action: "template.preview_remove", targetType: "template", targetId: id, ip: ctx.ip });
+    return this.getTemplate(id);
   }
 }
