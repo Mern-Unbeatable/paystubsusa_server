@@ -12,9 +12,9 @@ export const notFoundHandler: RequestHandler = (req, _res, next) => {
 export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   const requestId = req.id;
 
-  // Client errors are expected; only surface them (with stack) while developing.
+  // Client errors are logged server-side only (never sent to the client); skipped in tests to keep output clean.
   const status = err instanceof ZodError ? 422 : err instanceof AppError ? err.status : typeof err?.status === "number" ? err.status : 500;
-  if (env.NODE_ENV === "development" && status < 500) {
+  if (env.NODE_ENV !== "test" && status < 500) {
     // After "finish" so it prints below pino-http's request line (registered earlier, so it runs first).
     res.once("finish", () => logger.warn({ err, method: req.method, url: req.originalUrl, requestId }, "Handled request error"));
   }
