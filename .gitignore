@@ -6,5 +6,3 @@ temp_auto_push.bat
 coverage/
 config.bat
 
-.gitignore
-branch_structure.json
