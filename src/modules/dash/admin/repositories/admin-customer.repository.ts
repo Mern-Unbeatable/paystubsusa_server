@@ -1,4 +1,4 @@
-import type { UserStatus } from "../../../../generated/prisma/enums.ts";
+import type { SubscriptionStatus, UserStatus } from "../../../../generated/prisma/enums.ts";
 import type { PageRequest } from "../../../../shared/http/pagination.ts";
 
 export interface AdminCustomerRow {
@@ -12,11 +12,15 @@ export interface AdminCustomerRow {
   lifetimeSpendCents: number;
   createdAt: Date;
   lastLoginAt: Date | null;
+  /** Status of the current (active or past_due) subscription; null when the customer has none. */
+  subscriptionStatus: SubscriptionStatus | null;
 }
 
 export interface AdminCustomerFilter {
   q?: string;
   status?: UserStatus;
+  subscription?: "active" | "none";
+  emailVerified?: "verified" | "unverified";
   sort: "createdAt" | "lifetimeSpend";
 }
 

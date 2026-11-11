@@ -12,13 +12,22 @@ const columns = Prisma.sql`
     LEFT JOIN orders o ON o.id = p.order_id
     LEFT JOIN subscriptions s ON s.id = p.subscription_id
     WHERE (o.user_id = u.id OR s.user_id = u.id)
-      AND p.status IN ('succeeded', 'partially_refunded', 'refunded'))::int AS "lifetimeSpendCents"`;
+      AND p.status IN ('succeeded', 'partially_refunded', 'refunded'))::int AS "lifetimeSpendCents",
+  (SELECT s.status FROM subscriptions s WHERE s.user_id = u.id AND s.status IN ('active', 'past_due')
+    ORDER BY s.created_at DESC LIMIT 1) AS "subscriptionStatus"`;
+
+const hasCurrentSubscription = Prisma.sql`EXISTS (SELECT 1 FROM subscriptions s
+  WHERE s.user_id = u.id AND s.status IN ('active', 'past_due'))`;
 
 export class PrismaAdminCustomerRepository implements AdminCustomerRepository {
   async list(filter: AdminCustomerFilter, page: PageRequest) {
     const q = filter.q?.trim();
     const where = Prisma.sql`u.role = 'customer'
       ${filter.status ? Prisma.sql`AND u.status = ${filter.status}::"UserStatus"` : Prisma.empty}
+      ${filter.subscription === "active" ? Prisma.sql`AND ${hasCurrentSubscription}` : Prisma.empty}
+      ${filter.subscription === "none" ? Prisma.sql`AND NOT ${hasCurrentSubscription}` : Prisma.empty}
+      ${filter.emailVerified === "verified" ? Prisma.sql`AND u.email_verified_at IS NOT NULL` : Prisma.empty}
+      ${filter.emailVerified === "unverified" ? Prisma.sql`AND u.email_verified_at IS NULL` : Prisma.empty}
       ${q ? Prisma.sql`AND (u.email ILIKE ${`%${q}%`} OR u.name ILIKE ${`%${q}%`})` : Prisma.empty}`;
     const order = filter.sort === "lifetimeSpend" ? Prisma.sql`"lifetimeSpendCents" DESC, u.id DESC` : Prisma.sql`u.created_at DESC, u.id DESC`;
     const { skip, take } = skipTake(page);

@@ -16,6 +16,8 @@ export const customersQuery = z.object({
   ...paginationQuery,
   q,
   status: z.enum(["active", "suspended"]).optional(),
+  subscription: z.enum(["active", "none"]).optional(),
+  emailVerified: z.enum(["verified", "unverified"]).optional(),
   sort: z.enum(["-createdAt", "-lifetimeSpend"]).default("-createdAt").transform((s) => (s === "-lifetimeSpend" ? "lifetimeSpend" : "createdAt") as "createdAt" | "lifetimeSpend"),
 });
 
