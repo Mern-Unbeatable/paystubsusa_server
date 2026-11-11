@@ -6,6 +6,3 @@ temp_auto_push.bat
 coverage/
 config.bat
 
-.env
-.env.*
-.env.test
