@@ -34,7 +34,10 @@ export function adminRoutes(c: AdminController, users: UserRepository, idempoten
   router.post("/admin/subscriptions/:id/cancel", fresh, c.cancelSubscription);
 
   router.get("/admin/products", c.listProducts);
+  router.post("/admin/products", fresh, c.createProduct);
+  router.get("/admin/products/:code", c.getProduct);
   router.patch("/admin/products/:code", fresh, c.updateProduct);
+  router.delete("/admin/products/:code", fresh, c.deleteProduct);
 
   router.get("/admin/templates", c.listTemplates);
   router.patch("/admin/templates/:id", fresh, c.updateTemplate);

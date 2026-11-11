@@ -14,8 +14,10 @@ import type { AdminOperationsService } from "./admin-operations.service.ts";
 import {
   adminDocumentsQuery,
   adminOrdersQuery,
+  adminProductsQuery,
   adminTemplatesQuery,
   auditLogsQuery,
+  createProductBody,
   customersQuery,
   dashboardQuery,
   idParams,
@@ -121,14 +123,31 @@ export class AdminController {
     res.json({ data: await this.d.subscriptions.cancel(userPrincipal(req), id(req), atPeriodEnd, requestContext(req)) });
   };
 
-  listProducts = async (_req: Request, res: Response) => {
-    res.json({ data: await this.d.ops.listProducts() });
+  listProducts = async (req: Request, res: Response) => {
+    const { page, pageSize, status, ...filter } = parse(adminProductsQuery, req.query);
+    res.json(await this.d.ops.listProducts({ ...filter, isActive: status }, { page, pageSize }));
+  };
+
+  getProduct = async (req: Request, res: Response) => {
+    const { code } = parse(productParams, req.params);
+    res.json({ data: await this.d.ops.getProduct(code) });
+  };
+
+  createProduct = async (req: Request, res: Response) => {
+    const body = parse(createProductBody, req.body);
+    res.status(201).json({ data: await this.d.ops.createProduct(userPrincipal(req), body, requestContext(req)) });
   };
 
   updateProduct = async (req: Request, res: Response) => {
     const { code } = parse(productParams, req.params);
     const body = parse(updateProductBody, req.body);
     res.json({ data: await this.d.ops.updateProduct(userPrincipal(req), code, body, requestContext(req)) });
+  };
+
+  deleteProduct = async (req: Request, res: Response) => {
+    const { code } = parse(productParams, req.params);
+    await this.d.ops.deleteProduct(userPrincipal(req), code, requestContext(req));
+    res.status(204).end();
   };
 
   listTemplates = async (req: Request, res: Response) => {

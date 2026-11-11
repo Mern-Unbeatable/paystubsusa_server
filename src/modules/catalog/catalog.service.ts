@@ -1,9 +1,30 @@
 import type { DocumentType } from "../../generated/prisma/enums.ts";
-import { notFound, validation } from "../../shared/http/app-error.ts";
-import type { ProductRepository, ProductRow } from "./repositories/product.repository.ts";
+import { conflict, notFound, validation } from "../../shared/http/app-error.ts";
+import type { PageRequest } from "../../shared/http/pagination.ts";
+import type {
+  NewProduct,
+  ProductFilter,
+  ProductRepository,
+  ProductRow,
+  ProductUpdate,
+} from "./repositories/product.repository.ts";
 import type { TemplateRepository, TemplateRow } from "./repositories/template.repository.ts";
 
 export const MAX_ADDITIONAL_PAYSTUBS = 50;
+
+/**
+ * Seeded products that checkout, subscriptions and order summaries depend on by code.
+ * They can be repriced or deactivated, never deleted.
+ */
+export const SYSTEM_PRODUCT_CODES: ReadonlySet<string> = new Set([
+  "paystub_single",
+  "paystub_pack_3",
+  "paystub_additional",
+  "w2_single",
+  "nec1099_single",
+  "direct_deposit_single",
+  "unlimited_monthly",
+]);
 
 export interface QuoteLine {
   productId: string;
@@ -149,9 +170,44 @@ export class CatalogService {
     return this.products.list({ activeOnly: false });
   }
 
-  async updateProduct(code: string, input: { amountCents?: number; isActive?: boolean; stripePriceId?: string | null }) {
+  searchProducts(filter: ProductFilter, page: PageRequest) {
+    return this.products.search(filter, page);
+  }
+
+  async findProductWithUsage(code: string) {
+    const p = await this.products.findWithUsage(code);
+    if (!p) throw notFound("PRODUCT_NOT_FOUND", "Product not found");
+    return p;
+  }
+
+  /**
+   * Only one-time base products can be created: subscriptions and add-ons are wired to
+   * fixed codes. Paid orders grant paystub credits, so multi-credit packs must be paystubs.
+   */
+  async createProduct(input: NewProduct) {
+    if (input.creditQuantity > 1 && input.documentType !== "paystub") {
+      throw validation({ creditQuantity: ["Only paystub packages can include more than one document"] });
+    }
+    const created = await this.products.create(input);
+    if (!created) throw conflict("PRODUCT_CODE_TAKEN", "A product with this code already exists");
+    return created;
+  }
+
+  async updateProduct(code: string, input: ProductUpdate) {
     if (!(await this.products.findByCode(code))) throw notFound("PRODUCT_NOT_FOUND", "Product not found");
     return this.products.update(code, input);
+  }
+
+  /** Products that were ever sold stay for order history; deactivate those instead. */
+  async deleteProduct(code: string) {
+    const p = await this.findProductWithUsage(code);
+    if (SYSTEM_PRODUCT_CODES.has(p.code)) {
+      throw conflict("PRODUCT_PROTECTED", "This product is required by checkout and can only be deactivated");
+    }
+    if (p.usage.orderItems > 0 || p.usage.subscriptions > 0 || !(await this.products.delete(p.id))) {
+      throw conflict("PRODUCT_IN_USE", "This product is used by existing orders or subscriptions; deactivate it instead");
+    }
+    return p;
   }
 
   listAllTemplates(documentType?: DocumentType) {

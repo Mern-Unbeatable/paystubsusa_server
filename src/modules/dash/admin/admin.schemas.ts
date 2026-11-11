@@ -48,10 +48,45 @@ export const adminDocumentsQuery = z.object({
 
 export const productParams = z.object({ code: z.string().regex(/^[a-z0-9_]{1,64}$/) });
 
+export const adminProductsQuery = z.object({
+  ...paginationQuery,
+  q,
+  kind: z.enum(["one_time", "subscription"]).optional(),
+  documentType: documentTypeEnum.optional(),
+  status: z
+    .enum(["active", "inactive"])
+    .optional()
+    .transform((s) => (s === undefined ? undefined : s === "active")),
+});
+
+const productName = z.string().trim().min(1).max(100);
+const productAmount = z.number().int().min(50).max(1_000_000);
+const productBadge = z.string().trim().max(40).nullable().transform((b) => b || null);
+const productSortOrder = z.number().int().min(0).max(10_000);
+
+export const createProductBody = z
+  .object({
+    code: z.string().trim().regex(/^[a-z][a-z0-9_]{2,63}$/, { error: "Use 3–64 lowercase letters, digits or underscores" }),
+    documentType: documentTypeEnum,
+    name: productName,
+    amountCents: productAmount,
+    creditQuantity: z.number().int().min(1).max(50).default(1),
+    badge: productBadge.default(null),
+    sortOrder: productSortOrder.default(0),
+    isActive: z.boolean().default(true),
+  })
+  .strict();
+
 export const updateProductBody = z
-  .object({ amountCents: z.number().int().min(50).max(1_000_000).optional(), isActive: z.boolean().optional() })
+  .object({
+    name: productName.optional(),
+    amountCents: productAmount.optional(),
+    badge: productBadge.optional(),
+    sortOrder: productSortOrder.optional(),
+    isActive: z.boolean().optional(),
+  })
   .strict()
-  .refine((b) => b.amountCents !== undefined || b.isActive !== undefined, { error: "Nothing to update" });
+  .refine((b) => Object.values(b).some((v) => v !== undefined), { error: "Nothing to update" });
 
 export const adminTemplatesQuery = z.object({ documentType: documentTypeEnum.optional() });
 
