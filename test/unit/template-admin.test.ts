@@ -5,10 +5,28 @@ import {
   type ProductRepository,
   type TemplateRepository,
   type TemplateWithUsage,
+  templateVariantField,
 } from "../../src/modules/catalog/index.ts";
 import type { ObjectStorage } from "../../src/integrations/storage.ts";
 
 const variant = { headerVariant: "boxed", netPayVariant: "blue", tableVariant: "solid-dark" } as const;
+const theme = {
+  primaryColor: "#092258",
+  accentColor: "#1E60F2",
+  tintColor: "#EBF2FA",
+  backgroundColor: "#FFFFFF",
+  headingColor: "#0F172A",
+  textColor: "#475569",
+  borderColor: "#E2E8F0",
+  fontFamily: "serif",
+  fontScale: 1.1,
+  lineHeight: 1.4,
+  letterSpacing: 0,
+  pagePadding: 8,
+  sectionSpacing: 12,
+  borderRadius: 6,
+} as const;
+const themed = { ...variant, theme };
 
 const row = (code: string, p: Partial<TemplateWithUsage> = {}): TemplateWithUsage => ({
   id: `id-${code}`,
@@ -116,6 +134,31 @@ describe("CatalogService admin template rules", () => {
     const { service, repo } = setup([t]);
     await expect(service.updateTemplate(t.id, { variant })).rejects.toMatchObject({ status: 409, code: "TEMPLATE_LAYOUT_LOCKED" });
     expect(repo.update).not.toHaveBeenCalled();
+  });
+
+  it("saves a theme on an editable styled template", async () => {
+    const { service, repo } = setup([row("custom-1")]);
+    await service.updateTemplate("id-custom-1", { variant: themed });
+    expect(repo.update).toHaveBeenCalledWith("id-custom-1", { variant: themed });
+  });
+
+  it("rejects a theme on a layout that doesn't render it", async () => {
+    const { service, repo } = setup([]);
+    await expect(service.createTemplate(input({ documentType: "w2", renderer: "w2", variant: themed }))).rejects.toMatchObject({
+      status: 422,
+      errors: { variant: [expect.any(String)] },
+    });
+    expect(repo.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["a non-HEX colour", { primaryColor: "red" }],
+    ["a 3-digit HEX colour", { primaryColor: "#fff" }],
+    ["an out-of-range font scale", { fontScale: 3 }],
+    ["an unknown font family", { fontFamily: "Comic Sans" }],
+    ["an unknown field", { css: "body{}" }],
+  ])("rejects a theme with %s", (_label, patch) => {
+    expect(templateVariantField.safeParse({ ...variant, theme: { ...theme, ...patch } }).success).toBe(false);
   });
 
   it("still renames and deactivates built-in templates", async () => {

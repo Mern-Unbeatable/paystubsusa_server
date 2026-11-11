@@ -4,7 +4,7 @@ import type { ObjectStorage } from "../../integrations/storage.ts";
 import { conflict, notFound, validation } from "../../shared/http/app-error.ts";
 import type { PageRequest } from "../../shared/http/pagination.ts";
 import { logger } from "../../shared/logger.ts";
-import { TEMPLATE_RENDERERS, VARIANTLESS_RENDERERS } from "./catalog.schemas.ts";
+import { TEMPLATE_RENDERERS, THEMEABLE_RENDERER, VARIANTLESS_RENDERERS } from "./catalog.schemas.ts";
 import { normalizePreview } from "./template-preview.ts";
 import type {
   NewProduct,
@@ -25,8 +25,9 @@ import type {
 export const MAX_ADDITIONAL_PAYSTUBS = 50;
 
 /**
- * Seeded templates the public generator lists by code from its own bundle; their layout
- * must keep matching it, so they can be renamed or deactivated but never restyled or deleted.
+ * Seeded templates the generator falls back to by code from its own bundle when the API is
+ * unreachable; their layout must keep matching it, so they can be renamed or deactivated
+ * but never restyled or deleted.
  */
 const SYSTEM_TEMPLATE_KEYS: ReadonlySet<string> = new Set([
   ...["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"].map((code) => `paystub:${code}`),
@@ -108,6 +109,7 @@ export const toTemplateDto = (t: TemplateRow) => ({
 });
 
 const itemsError = (message: string) => validation({ items: [message] });
+const themeUnsupported = () => validation({ variant: ["This layout doesn't support custom colours and typography"] });
 
 export class CatalogService {
   private readonly products: ProductRepository;
@@ -271,6 +273,7 @@ export class CatalogService {
     const variantless = VARIANTLESS_RENDERERS.has(input.renderer);
     if (variantless && input.variant) throw validation({ variant: ["This layout has no style options"] });
     if (!variantless && !input.variant) throw validation({ variant: ["Choose the layout style"] });
+    if (input.variant?.theme && input.renderer !== THEMEABLE_RENDERER) throw themeUnsupported();
     const created = await this.templates.create(input);
     if (!created) throw conflict("TEMPLATE_CODE_TAKEN", "A template with this code already exists for this document type");
     return created;
@@ -287,6 +290,7 @@ export class CatalogService {
         "This template's layout can't be changed because it is a built-in template or documents were issued with it; create a new template instead",
       );
     }
+    if (input.variant?.theme && t.renderer !== THEMEABLE_RENDERER) throw themeUnsupported();
     return this.templates.update(id, input);
   }
 
