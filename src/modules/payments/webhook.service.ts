@@ -94,7 +94,9 @@ export class WebhookService {
       case "invoice.paid":
       case "invoice.payment_failed": {
         const subId = idOf(event.data.object.parent?.subscription_details?.subscription);
-        return subId ? { subscription: await this.d.gateway.retrieveSubscription(subId) } : {};
+        if (!subId) return {};
+        const card = event.type === "invoice.paid" && event.data.object.id ? await this.d.gateway.getInvoiceCardDetails(event.data.object.id) : null;
+        return { subscription: await this.d.gateway.retrieveSubscription(subId), ...(card ? { card } : {}) };
       }
       default:
         return {};
@@ -180,6 +182,8 @@ export class WebhookService {
         amountCents: paid ? invoice.amount_paid : invoice.amount_due,
         currency: invoice.currency,
         status: paid ? "succeeded" : "failed",
+        receiptUrl: invoice.hosted_invoice_url ?? null,
+        ...(pre.card ? { cardBrand: pre.card.cardBrand, cardLast4: pre.card.cardLast4 } : {}),
       },
       tx,
     );

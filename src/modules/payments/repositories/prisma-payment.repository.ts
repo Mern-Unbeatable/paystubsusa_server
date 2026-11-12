@@ -55,7 +55,16 @@ export class PrismaPaymentRepository implements PaymentRepository {
   }
 
   upsertInvoice(
-    input: { subscriptionId: string; providerPaymentId: string; amountCents: number; currency: string; status: PaymentStatus },
+    input: {
+      subscriptionId: string;
+      providerPaymentId: string;
+      amountCents: number;
+      currency: string;
+      status: PaymentStatus;
+      receiptUrl?: string | null;
+      cardBrand?: string | null;
+      cardLast4?: string | null;
+    },
     tx?: Tx,
   ) {
     const { subscriptionId, providerPaymentId, ...rest } = input;

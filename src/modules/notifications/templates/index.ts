@@ -5,10 +5,6 @@ const esc = (s: string) =>
 
 const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
-const layout = (title: string, bodyHtml: string) =>
-  `<!doctype html><html><body style="font-family:Arial,sans-serif;color:#111;max-width:560px;margin:auto">` +
-  `<h2>${esc(title)}</h2>${bodyHtml}<p style="color:#666;font-size:12px">Paystubs USA</p></body></html>`;
-
 /** 2076×758 with wide transparent side margins; keep the <img> at that ratio. */
 const LOGO_URL = "https://raw.githubusercontent.com/Mern-Unbeatable/paystubsusa_frontend/refs/heads/main/src/assets/logo.png";
 
@@ -191,12 +187,35 @@ export const emailTemplates = {
     attachments: [p.file],
   }),
 
-  contact_notification: (p: { name: string; email: string; subject: string; message: string }): Rendered => ({
-    subject: `[Contact] ${p.subject}`,
-    text: `From: ${p.name} <${p.email}>\n\n${p.message}`,
-    html: layout("New contact message", `<p>From: ${esc(p.name)} &lt;${esc(p.email)}&gt;</p><p><b>${esc(p.subject)}</b></p><pre style="white-space:pre-wrap">${esc(p.message)}</pre>`),
-    tag: "contact",
-  }),
+  contact_notification: (p: { name: string; email: string; subject: string; message: string }): Rendered => {
+    const label = "font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px";
+    const value = "margin-top:4px;font-size:14px;font-weight:700;color:#111827;word-break:break-word";
+    const mailto = `mailto:${p.email}?subject=${encodeURIComponent(`Re: ${p.subject}`)}`;
+    const firstName = p.name.trim().split(/\s+/)[0] || p.name;
+    return {
+      subject: `[Contact] ${p.subject}`,
+      text: `New contact message\n\nFrom: ${p.name} <${p.email}>\nSubject: ${p.subject}\n\n${p.message}\n\nReply to this email to answer ${p.name} directly.`,
+      html: cardLayout(
+        "New contact message",
+        `<p style="margin:0 0 28px;font-size:15px;line-height:22px;color:#1f2937"><b>${esc(p.name)}</b> sent a message through Paystubs USA support.</p>` +
+          `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:12px;text-align:left;font-size:14px;color:#1f2937;border-collapse:separate">` +
+          `<tr><td style="padding:18px 20px;border-bottom:1px solid #e5e7eb;border-radius:12px 0 0 0;background:#f9fafb;font-size:18px;font-weight:700;color:#092258;letter-spacing:1px">MESSAGE</td>` +
+          `<td align="right" style="padding:18px 20px;border-bottom:1px solid #e5e7eb;border-radius:0 12px 0 0;background:#f9fafb"><span style="display:inline-block;padding:4px 12px;background:#dbeafe;border-radius:999px;font-size:12px;font-weight:700;color:#1d4ed8">NEW</span></td></tr>` +
+          `<tr><td width="50%" valign="top" style="padding:18px 20px 14px"><div style="${label}">From</div><div style="${value}">${esc(p.name)}</div></td>` +
+          `<td width="50%" valign="top" style="padding:18px 20px 14px"><div style="${label}">Email</div><div style="${value}"><a href="mailto:${esc(p.email)}" style="color:#092258;text-decoration:none">${esc(p.email)}</a></div></td></tr>` +
+          `<tr><td colspan="2" style="padding:0 20px 18px"><div style="${label}">Subject</div><div style="${value}">${esc(p.subject)}</div></td></tr>` +
+          `<tr><td colspan="2" style="padding:18px 20px 20px;border-top:1px solid #e5e7eb"><div style="${label};margin-bottom:10px">Message</div>` +
+          `<div style="padding:16px 18px;background:#f9fafb;border-left:4px solid #092258;border-radius:8px;font-size:15px;line-height:23px;color:#1f2937;white-space:pre-wrap;word-break:break-word">${esc(p.message)}</div></td></tr></table>` +
+          `<div style="margin:22px 0 0;text-align:center">` +
+          `<a href="${esc(mailto)}" target="_blank" style="display:inline-block;margin:6px;padding:12px 24px;background:#092258;border:2px solid #092258;border-radius:10px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none">Reply to ${esc(firstName)}</a></div>` +
+          `<p style="margin:20px 0 0;font-size:13px;line-height:20px;color:#6b7280">You can also just reply to this email; it goes straight to ${esc(p.email)}.</p>`,
+        `<table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto 16px"><tr>` +
+          `<td style="width:56px;height:56px;background:#dbeafe;border-radius:28px;text-align:center;line-height:56px;font-size:26px;color:#1d4ed8">&#9993;</td></tr></table>`,
+      ),
+      replyTo: p.email,
+      tag: "contact",
+    };
+  },
 } as const;
 
 export type EmailTemplateName = keyof typeof emailTemplates;

@@ -8,15 +8,20 @@ import { listPaymentsQuery, paymentIdParams } from "./payments.schemas.ts";
 export class PaymentsController {
   private readonly payments: PaymentsService;
   private readonly webhooks: WebhookService;
+  private readonly syncSubscriptions: (userId: string) => Promise<void>;
 
-  constructor(payments: PaymentsService, webhooks: WebhookService) {
+  /** syncSubscriptions pulls invoice payments from Stripe in case their webhooks never arrived. */
+  constructor(payments: PaymentsService, webhooks: WebhookService, syncSubscriptions: (userId: string) => Promise<void>) {
     this.payments = payments;
     this.webhooks = webhooks;
+    this.syncSubscriptions = syncSubscriptions;
   }
 
   list = async (req: Request, res: Response) => {
     const { status, ...page } = parse(listPaymentsQuery, req.query);
-    res.json(await this.payments.list(ownerPrincipal(req), { status }, page));
+    const principal = ownerPrincipal(req);
+    if (principal.type === "user") await this.syncSubscriptions(principal.userId);
+    res.json(await this.payments.list(principal, { status }, page));
   };
 
   get = async (req: Request, res: Response) => {

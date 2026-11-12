@@ -10,6 +10,8 @@ export interface OutgoingEmail {
   html: string;
   /** Category label (e.g. "password-reset"); sent as the X-Email-Tag header. */
   tag?: string;
+  /** Where "Reply" in the recipient's mail app goes (e.g. the customer who wrote in). */
+  replyTo?: string;
   attachments?: { filename: string; content: Buffer; contentType: string }[];
 }
 
@@ -56,6 +58,7 @@ export class SmtpMailer implements Mailer {
         subject: email.subject,
         text: email.text,
         html: email.html,
+        replyTo: email.replyTo,
         headers: email.tag ? { "X-Email-Tag": email.tag } : undefined,
         attachments: email.attachments,
       });

@@ -44,6 +44,9 @@ export class FakeGateway implements PaymentGateway {
   async getCardDetails() {
     return { cardBrand: "visa", cardLast4: "4242", receiptUrl: "https://pay.stripe.com/receipts/test" };
   }
+  async getInvoiceCardDetails() {
+    return { cardBrand: "visa", cardLast4: "4242", receiptUrl: null };
+  }
   async createRefund(input: Parameters<PaymentGateway["createRefund"]>[0]) {
     this.refunds.push({ paymentIntentId: input.paymentIntentId, amountCents: input.amountCents });
     return { id: `re_test_${++this.n}`, status: "pending" };
@@ -52,7 +55,7 @@ export class FakeGateway implements PaymentGateway {
     return `cus_test_${++this.n}`;
   }
   async createSubscriptionCheckout() {
-    return "https://checkout.stripe.com/test";
+    return "cs_test_secret_test";
   }
   async createPortalSession() {
     return "https://billing.stripe.com/test";
@@ -62,6 +65,12 @@ export class FakeGateway implements PaymentGateway {
   }
   retrieveSubscription(): never {
     throw new Error("not used");
+  }
+  async listCustomerSubscriptions() {
+    return [];
+  }
+  async listSubscriptionInvoices() {
+    return [];
   }
   async createPrice() {
     return `price_test_${++this.n}`;

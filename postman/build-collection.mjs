@@ -978,13 +978,13 @@ pm.test("null or the subscription shape", function () {
   folder("Create Checkout", "", [
     req("Create Checkout Session", "POST", "/me/subscription/checkout-session", {
       auth: "customer",
-      desc: "201 `{data:{url}}` (Stripe Checkout). 409 `SUBSCRIPTION_ACTIVE` if already subscribed; 503 `SUBSCRIPTION_UNAVAILABLE` when the plan has no Stripe price.",
+      desc: "201 `{data:{clientSecret}}` (Stripe Checkout Session for the Payment Element in the app). 409 `SUBSCRIPTION_ACTIVE` if already subscribed; 503 `SUBSCRIPTION_UNAVAILABLE` when the plan has no Stripe price.",
       pre: guard({ needs: ["customerToken"] }),
       test: `
-pm.test("checkout URL, or a documented refusal", function () {
+pm.test("checkout client secret, or a documented refusal", function () {
   pm.expect(pm.response.code).to.be.oneOf([201, 409, 503]);
   const b = pm.response.json();
-  if (pm.response.code === 201) pm.expect(b.data.url).to.match(/^https:\\/\\//);
+  if (pm.response.code === 201) pm.expect(b.data.clientSecret).to.be.a("string").and.not.empty;
   if (pm.response.code === 409) pm.expect(b.code).to.eql("SUBSCRIPTION_ACTIVE");
   if (pm.response.code === 503) pm.expect(b.code).to.eql("SUBSCRIPTION_UNAVAILABLE");
 });`,
