@@ -9511,7 +9511,7 @@
             },
             {
               "name": "Contact Messages",
-              "description": "Support inbox (spec §9.10; no UI yet).",
+              "description": "Support inbox (spec §9.10), shown at /admin/contacts. Filters: `status` (new | handled) and `q` (name, email or subject). Create, edit and delete need a fresh admin role check; the audit log records which fields changed, never their content.",
               "item": [
                 {
                   "name": "List New Contact Messages",
@@ -9557,6 +9557,66 @@
                         {
                           "key": "status",
                           "value": "new"
+                        },
+                        {
+                          "key": "page",
+                          "value": "1"
+                        },
+                        {
+                          "key": "pageSize",
+                          "value": "20"
+                        }
+                      ]
+                    },
+                    "description": ""
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Search Contact Messages",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+                          "",
+                          "pm.test(\"list envelope with pagination meta\", function () {",
+                          "const b = pm.response.json();",
+                          "pm.expect(b.data).to.be.an(\"array\");",
+                          "pm.expect(b.meta).to.include.all.keys(\"page\", \"pageSize\", \"totalItems\", \"totalPages\");",
+                          "pm.expect(b.meta.page).to.eql(Number(pm.request.url.query.get(\"page\") || 1));",
+                          "pm.expect(b.data.length).to.be.at.most(b.meta.pageSize);",
+                          "pm.expect(b.meta.totalPages).to.eql(Math.ceil(b.meta.totalItems / b.meta.pageSize));",
+                          "});",
+                          "pm.test(\"matches name, email or subject\", function () {",
+                          "pm.response.json().data.forEach(function (m) {",
+                          "pm.expect((m.name + \" \" + m.email + \" \" + m.subject).toLowerCase()).to.include(\"postman\");",
+                          "});",
+                          "});"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/{{apiVersion}}/admin/contact-messages?q=Postman&page=1&pageSize=20",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "{{apiVersion}}",
+                        "admin",
+                        "contact-messages"
+                      ],
+                      "query": [
+                        {
+                          "key": "q",
+                          "value": "Postman"
                         },
                         {
                           "key": "page",
@@ -9627,6 +9687,265 @@
                           "language": "json"
                         }
                       }
+                    },
+                    "description": ""
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Create Contact Message (logged by admin)",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"status is 201\", function () { pm.response.to.have.status(201); });",
+                          "const m = pm.response.json().data;",
+                          "pm.test(\"created as new\", function () { pm.expect(m.status).to.eql(\"new\"); });",
+                          "pm.environment.set(\"adminContactMessageId\", m.id);"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/{{apiVersion}}/admin/contact-messages",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "{{apiVersion}}",
+                        "admin",
+                        "contact-messages"
+                      ]
+                    },
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": \"QA Phone Caller\",\n  \"email\": \"qa.phone@example.test\",\n  \"subject\": \"Postman admin-logged message\",\n  \"message\": \"Logged by an admin from the Postman collection.\",\n  \"status\": \"new\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "description": "Records a message received another way (phone, email). No notification email is sent."
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Edit Contact Message",
+                  "event": [
+                    {
+                      "listen": "prerequest",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "let skipReason = \"\";",
+                          "const missing = [\"adminToken\",\"adminContactMessageId\"].filter(function (v) { return !pm.variables.get(v); });",
+                          "if (missing.length) skipReason = \"set \" + missing.join(\", \") + \" first\";",
+                          "if (skipReason) { console.warn(\"Skipped \\\"\" + pm.info.requestName + \"\\\": \" + skipReason); pm.execution.skipRequest(); }"
+                        ]
+                      }
+                    },
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+                          "const m = pm.response.json().data;",
+                          "pm.test(\"edited\", function () { pm.expect(m.subject).to.include(\"(edited)\"); pm.expect(m.status).to.eql(\"handled\"); });"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "PATCH",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/{{apiVersion}}/admin/contact-messages/{{adminContactMessageId}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "{{apiVersion}}",
+                        "admin",
+                        "contact-messages",
+                        "{{adminContactMessageId}}"
+                      ]
+                    },
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"subject\": \"Postman admin-logged message (edited)\",\n  \"status\": \"handled\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "description": ""
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Edit Contact Message - Empty Body",
+                  "event": [
+                    {
+                      "listen": "prerequest",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "let skipReason = \"\";",
+                          "const missing = [\"adminToken\",\"adminContactMessageId\"].filter(function (v) { return !pm.variables.get(v); });",
+                          "if (missing.length) skipReason = \"set \" + missing.join(\", \") + \" first\";",
+                          "if (skipReason) { console.warn(\"Skipped \\\"\" + pm.info.requestName + \"\\\": \" + skipReason); pm.execution.skipRequest(); }"
+                        ]
+                      }
+                    },
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"status is 400\", function () { pm.response.to.have.status(400); });"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "PATCH",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/{{apiVersion}}/admin/contact-messages/{{adminContactMessageId}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "{{apiVersion}}",
+                        "admin",
+                        "contact-messages",
+                        "{{adminContactMessageId}}"
+                      ]
+                    },
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "description": ""
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Delete Contact Message",
+                  "event": [
+                    {
+                      "listen": "prerequest",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "let skipReason = \"\";",
+                          "const missing = [\"adminToken\",\"adminContactMessageId\"].filter(function (v) { return !pm.variables.get(v); });",
+                          "if (missing.length) skipReason = \"set \" + missing.join(\", \") + \" first\";",
+                          "if (skipReason) { console.warn(\"Skipped \\\"\" + pm.info.requestName + \"\\\": \" + skipReason); pm.execution.skipRequest(); }"
+                        ]
+                      }
+                    },
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"status is 204\", function () { pm.response.to.have.status(204); });"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "DELETE",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/{{apiVersion}}/admin/contact-messages/{{adminContactMessageId}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "{{apiVersion}}",
+                        "admin",
+                        "contact-messages",
+                        "{{adminContactMessageId}}"
+                      ]
+                    },
+                    "description": ""
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Delete Contact Message - Already Deleted",
+                  "event": [
+                    {
+                      "listen": "prerequest",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "let skipReason = \"\";",
+                          "const missing = [\"adminToken\",\"adminContactMessageId\"].filter(function (v) { return !pm.variables.get(v); });",
+                          "if (missing.length) skipReason = \"set \" + missing.join(\", \") + \" first\";",
+                          "if (skipReason) { console.warn(\"Skipped \\\"\" + pm.info.requestName + \"\\\": \" + skipReason); pm.execution.skipRequest(); }"
+                        ]
+                      }
+                    },
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"status is 404\", function () { pm.response.to.have.status(404); });"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "DELETE",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/{{apiVersion}}/admin/contact-messages/{{adminContactMessageId}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "{{apiVersion}}",
+                        "admin",
+                        "contact-messages",
+                        "{{adminContactMessageId}}"
+                      ]
                     },
                     "description": ""
                   },

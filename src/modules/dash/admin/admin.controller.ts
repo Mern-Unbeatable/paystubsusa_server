@@ -8,7 +8,7 @@ import type { DocumentsService } from "../../documents/index.ts";
 import type { OrdersService } from "../../orders/index.ts";
 import { adminListPaymentsQuery, type PaymentsService } from "../../payments/index.ts";
 import { cancelSubscriptionBody, listSubscriptionsQuery, type SubscriptionsService } from "../../subscriptions/index.ts";
-import { listContactMessagesQuery, updateContactMessageBody, type SupportService } from "../../support/index.ts";
+import { createContactMessageBody, listContactMessagesQuery, updateContactMessageBody, type SupportService } from "../../support/index.ts";
 import type { AdminCustomersService } from "./admin-customers.service.ts";
 import type { AdminDashboardService } from "./admin-dashboard.service.ts";
 import type { AdminOperationsService } from "./admin-operations.service.ts";
@@ -192,13 +192,23 @@ export class AdminController {
   };
 
   listContactMessages = async (req: Request, res: Response) => {
-    const { page, pageSize, status } = parse(listContactMessagesQuery, req.query);
-    res.json(await this.d.support.list({ status }, { page, pageSize }));
+    const { page, pageSize, status, q } = parse(listContactMessagesQuery, req.query);
+    res.json(await this.d.support.list({ status, q: q || undefined }, { page, pageSize }));
+  };
+
+  createContactMessage = async (req: Request, res: Response) => {
+    const input = parse(createContactMessageBody, req.body);
+    res.status(201).json({ data: await this.d.support.create(userPrincipal(req), input, requestContext(req)) });
   };
 
   updateContactMessage = async (req: Request, res: Response) => {
-    const { status } = parse(updateContactMessageBody, req.body);
-    res.json({ data: await this.d.support.setStatus(userPrincipal(req), id(req), status, requestContext(req)) });
+    const changes = parse(updateContactMessageBody, req.body);
+    res.json({ data: await this.d.support.update(userPrincipal(req), id(req), changes, requestContext(req)) });
+  };
+
+  deleteContactMessage = async (req: Request, res: Response) => {
+    await this.d.support.remove(userPrincipal(req), id(req), requestContext(req));
+    res.status(204).end();
   };
 
   listAuditLogs = async (req: Request, res: Response) => {

@@ -1479,7 +1479,7 @@ pm.environment.set("adminTemplateSortOrder", String(def.sortOrder));`,
         test: error(422, "VALIDATION_ERROR"),
       }),
     ]),
-    folder("Contact Messages", "Support inbox (spec §9.10; no UI yet).", [
+    folder("Contact Messages", "Support inbox (spec §9.10), shown at /admin/contacts. Filters: `status` (new | handled) and `q` (name, email or subject). Create, edit and delete need a fresh admin role check; the audit log records which fields changed, never their content.", [
       req("List New Contact Messages", "GET", "/admin/contact-messages?status=new&page=1&pageSize=20", {
         test: `
 ${status(200)}
@@ -1489,10 +1489,43 @@ pm.test("all new", function () { rows.forEach(function (m) { pm.expect(m.status)
 const mine = rows.find(function (m) { return m.subject === "Postman contact test"; });
 if (mine) pm.environment.set("contactMessageId", mine.id);`,
       }),
+      req("Search Contact Messages", "GET", "/admin/contact-messages?q=Postman&page=1&pageSize=20", {
+        test: `
+${status(200)}
+${pagination}
+pm.test("matches name, email or subject", function () {
+  pm.response.json().data.forEach(function (m) {
+    pm.expect((m.name + " " + m.email + " " + m.subject).toLowerCase()).to.include("postman");
+  });
+});`,
+      }),
       req("Mark Contact Message Handled", "PATCH", "/admin/contact-messages/{{contactMessageId}}", {
         pre: guard({ needs: ["adminToken", "contactMessageId"] }),
         body: { status: "handled" },
         test: `${status(200)}\npm.test("handled", function () { pm.expect(pm.response.json().data.status).to.eql("handled"); });`,
+      }),
+      req("Create Contact Message (logged by admin)", "POST", "/admin/contact-messages", {
+        desc: "Records a message received another way (phone, email). No notification email is sent.",
+        body: { name: "QA Phone Caller", email: "qa.phone@example.test", subject: "Postman admin-logged message", message: "Logged by an admin from the Postman collection.", status: "new" },
+        test: `${status(201)}\nconst m = pm.response.json().data;\npm.test("created as new", function () { pm.expect(m.status).to.eql("new"); });\npm.environment.set("adminContactMessageId", m.id);`,
+      }),
+      req("Edit Contact Message", "PATCH", "/admin/contact-messages/{{adminContactMessageId}}", {
+        pre: guard({ needs: ["adminToken", "adminContactMessageId"] }),
+        body: { subject: "Postman admin-logged message (edited)", status: "handled" },
+        test: `${status(200)}\nconst m = pm.response.json().data;\npm.test("edited", function () { pm.expect(m.subject).to.include("(edited)"); pm.expect(m.status).to.eql("handled"); });`,
+      }),
+      req("Edit Contact Message - Empty Body", "PATCH", "/admin/contact-messages/{{adminContactMessageId}}", {
+        pre: guard({ needs: ["adminToken", "adminContactMessageId"] }),
+        body: {},
+        test: status(400),
+      }),
+      req("Delete Contact Message", "DELETE", "/admin/contact-messages/{{adminContactMessageId}}", {
+        pre: guard({ needs: ["adminToken", "adminContactMessageId"] }),
+        test: status(204),
+      }),
+      req("Delete Contact Message - Already Deleted", "DELETE", "/admin/contact-messages/{{adminContactMessageId}}", {
+        pre: guard({ needs: ["adminToken", "adminContactMessageId"] }),
+        test: status(404),
       }),
     ]),
     folder("Audit Logs", "", [
@@ -1553,7 +1586,7 @@ const runtimeVars = [
   "orderId", "orderIdempotencyKey", "orderTotalCents", "paymentIntentId", "entitlementId", "documentId", "redeemedDocumentId", "paymentId",
   "guestOrderId", "guestOrderIdempotencyKey", "guestOrderTotalCents", "guestPaymentIntentId", "guestDocumentId",
   "scratchIdempotencyKey", "refundIdempotencyKey", "webhookPayload", "webhookSignature",
-  "subscriptionId", "contactMessageId", "adminTemplateId", "adminTemplateSortOrder",
+  "subscriptionId", "contactMessageId", "adminContactMessageId", "adminTemplateId", "adminTemplateSortOrder",
 ];
 const SECRET = new Set(["customerPassword", "customerNewPassword", "customer2Password", "adminPassword", "stripeWebhookSecret", "customerToken", "customer2Token", "adminToken", "guestToken", "resetToken"]);
 

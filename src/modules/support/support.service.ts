@@ -6,7 +6,7 @@ import { toPage, type PageRequest } from "../../shared/http/pagination.ts";
 import type { Principal, RequestContext } from "../../shared/types.ts";
 import { actorOf, type AuditService } from "../audit/index.ts";
 import type { NotificationsService } from "../notifications/index.ts";
-import type { ContactMessageRepository } from "./repositories/contact-message.repository.ts";
+import type { ContactMessageChanges, ContactMessageRepository } from "./repositories/contact-message.repository.ts";
 
 export interface ContactInput {
   name: string;
@@ -35,15 +35,28 @@ export class SupportService {
     });
   }
 
-  async list(filter: { status?: ContactStatus }, page: PageRequest) {
+  async list(filter: { status?: ContactStatus; q?: string }, page: PageRequest) {
     const { items, total } = await this.messages.list(filter, page);
     return toPage(items, total, page);
   }
 
-  async setStatus(principal: Principal, id: string, status: ContactStatus, ctx: RequestContext) {
-    const updated = await this.messages.setStatus(id, status);
+  async create(principal: Principal, input: ContactInput & { status: ContactStatus }, ctx: RequestContext) {
+    const created = await this.messages.create({ ...input, ip: null });
+    await this.audit.record({ ...actorOf(principal), action: "contact_message.create", targetType: "contact_message", targetId: created.id, metadata: { status: created.status }, ip: ctx.ip });
+    return created;
+  }
+
+  async update(principal: Principal, id: string, changes: ContactMessageChanges, ctx: RequestContext) {
+    const updated = await this.messages.update(id, changes);
     if (!updated) throw notFound("CONTACT_MESSAGE_NOT_FOUND", "Message not found");
-    await this.audit.record({ ...actorOf(principal), action: "contact_message.update", targetType: "contact_message", targetId: id, metadata: { status }, ip: ctx.ip });
+    // Field names only: the audit log must not copy the customer's message or email.
+    const metadata = { fields: Object.keys(changes), ...(changes.status && { status: changes.status }) };
+    await this.audit.record({ ...actorOf(principal), action: "contact_message.update", targetType: "contact_message", targetId: id, metadata, ip: ctx.ip });
     return updated;
+  }
+
+  async remove(principal: Principal, id: string, ctx: RequestContext) {
+    if (!(await this.messages.delete(id))) throw notFound("CONTACT_MESSAGE_NOT_FOUND", "Message not found");
+    await this.audit.record({ ...actorOf(principal), action: "contact_message.delete", targetType: "contact_message", targetId: id, ip: ctx.ip });
   }
 }
