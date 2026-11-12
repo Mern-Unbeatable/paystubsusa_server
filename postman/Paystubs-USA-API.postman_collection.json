@@ -8458,6 +8458,156 @@
                   "response": []
                 },
                 {
+                  "name": "List Guest Orders",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+                          "",
+                          "pm.test(\"list envelope with pagination meta\", function () {",
+                          "const b = pm.response.json();",
+                          "pm.expect(b.data).to.be.an(\"array\");",
+                          "pm.expect(b.meta).to.include.all.keys(\"page\", \"pageSize\", \"totalItems\", \"totalPages\");",
+                          "pm.expect(b.meta.page).to.eql(Number(pm.request.url.query.get(\"page\") || 1));",
+                          "pm.expect(b.data.length).to.be.at.most(b.meta.pageSize);",
+                          "pm.expect(b.meta.totalPages).to.eql(Math.ceil(b.meta.totalItems / b.meta.pageSize));",
+                          "});",
+                          "pm.test(\"all guest orders\", function () { pm.response.json().data.forEach(function (o) { pm.expect(o.userId).to.eql(null); }); });"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/{{apiVersion}}/admin/orders?buyer=guest&page=1&pageSize=20",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "{{apiVersion}}",
+                        "admin",
+                        "orders"
+                      ],
+                      "query": [
+                        {
+                          "key": "buyer",
+                          "value": "guest"
+                        },
+                        {
+                          "key": "page",
+                          "value": "1"
+                        },
+                        {
+                          "key": "pageSize",
+                          "value": "20"
+                        }
+                      ]
+                    },
+                    "description": "Orders placed without an account (`userId` is null). `buyer=customer` returns account-linked orders."
+                  },
+                  "response": []
+                },
+                {
+                  "name": "List Customer Orders",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+                          "",
+                          "pm.test(\"list envelope with pagination meta\", function () {",
+                          "const b = pm.response.json();",
+                          "pm.expect(b.data).to.be.an(\"array\");",
+                          "pm.expect(b.meta).to.include.all.keys(\"page\", \"pageSize\", \"totalItems\", \"totalPages\");",
+                          "pm.expect(b.meta.page).to.eql(Number(pm.request.url.query.get(\"page\") || 1));",
+                          "pm.expect(b.data.length).to.be.at.most(b.meta.pageSize);",
+                          "pm.expect(b.meta.totalPages).to.eql(Math.ceil(b.meta.totalItems / b.meta.pageSize));",
+                          "});",
+                          "pm.test(\"all linked to an account\", function () { pm.response.json().data.forEach(function (o) { pm.expect(o.userId).to.be.a(\"string\"); }); });"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/{{apiVersion}}/admin/orders?buyer=customer&page=1&pageSize=20",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "{{apiVersion}}",
+                        "admin",
+                        "orders"
+                      ],
+                      "query": [
+                        {
+                          "key": "buyer",
+                          "value": "customer"
+                        },
+                        {
+                          "key": "page",
+                          "value": "1"
+                        },
+                        {
+                          "key": "pageSize",
+                          "value": "20"
+                        }
+                      ]
+                    },
+                    "description": ""
+                  },
+                  "response": []
+                },
+                {
+                  "name": "List Orders - Invalid Buyer",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"status is 400\", function () { pm.response.to.have.status(400); });"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/{{apiVersion}}/admin/orders?buyer=admin",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "{{apiVersion}}",
+                        "admin",
+                        "orders"
+                      ],
+                      "query": [
+                        {
+                          "key": "buyer",
+                          "value": "admin"
+                        }
+                      ]
+                    },
+                    "description": ""
+                  },
+                  "response": []
+                },
+                {
                   "name": "Get Order Detail",
                   "event": [
                     {

@@ -82,6 +82,8 @@ export class PrismaOrderRepository implements OrderRepository {
         scopeWhere(scope),
         filter.status ? { status: filter.status } : {},
         filter.documentType ? { documentType: filter.documentType } : {},
+        filter.buyer === "guest" ? { userId: null } : {},
+        filter.buyer === "customer" ? { userId: { not: null } } : {},
         { createdAt: { gte: filter.from, lte: filter.to } },
         q
           ? { OR: [{ orderNumber: { contains: q, mode: "insensitive" } }, { email: { contains: q, mode: "insensitive" } }] }

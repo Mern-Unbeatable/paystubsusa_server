@@ -43,6 +43,7 @@ export const adminOrdersQuery = z.object({
   q,
   status: orderStatusEnum.optional(),
   documentType: documentTypeEnum.optional(),
+  buyer: z.enum(["guest", "customer"]).optional(),
   from: dateFilter,
   to: dateFilter,
 });

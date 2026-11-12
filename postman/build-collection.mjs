@@ -1360,6 +1360,14 @@ pm.test("customer with orders, documents and subscription", function () {
         pre: guard({ needs: ["adminToken", "customerEmail"] }),
         test: `${status(200)}\n${pagination}\npm.test("matches the email", function () { pm.response.json().data.forEach(function (o) { pm.expect(o.email).to.include(pm.variables.get("customerEmail")); }); });`,
       }),
+      req("List Guest Orders", "GET", "/admin/orders?buyer=guest&page=1&pageSize=20", {
+        desc: "Orders placed without an account (`userId` is null). `buyer=customer` returns account-linked orders.",
+        test: `${status(200)}\n${pagination}\npm.test("all guest orders", function () { pm.response.json().data.forEach(function (o) { pm.expect(o.userId).to.eql(null); }); });`,
+      }),
+      req("List Customer Orders", "GET", "/admin/orders?buyer=customer&page=1&pageSize=20", {
+        test: `${status(200)}\n${pagination}\npm.test("all linked to an account", function () { pm.response.json().data.forEach(function (o) { pm.expect(o.userId).to.be.a("string"); }); });`,
+      }),
+      req("List Orders - Invalid Buyer", "GET", "/admin/orders?buyer=admin", { test: status(400) }),
       req("Get Order Detail", "GET", "/admin/orders/{{orderId}}", {
         pre: guard({ needs: ["adminToken", "orderId"] }),
         test: `
