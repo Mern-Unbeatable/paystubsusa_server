@@ -1193,6 +1193,7 @@ pm.variables.set("forgedToken", [b64url({ alg: "EdDSA" }), b64url({ sub: "forged
       test: error(404, "ORDER_NOT_FOUND"),
     }),
     req("Customer → Admin Customers", "GET", "/admin/customers", { auth: "customer", pre: guard({ needs: ["customerToken"] }), test: error(403, "FORBIDDEN") }),
+    req("Customer → Admin Guest Buyers", "GET", "/admin/guest-buyers", { auth: "customer", pre: guard({ needs: ["customerToken"] }), test: error(403, "FORBIDDEN") }),
     req("Customer → Admin Product Update", "PATCH", "/admin/products/paystub_single", {
       auth: "customer",
       pre: guard({ needs: ["customerToken"] }),
@@ -1306,6 +1307,16 @@ pm.test("sorted by spend, active only", function () {
   for (let i = 1; i < rows.length; i++) pm.expect(rows[i - 1].lifetimeSpendCents).to.be.at.least(rows[i].lifetimeSpendCents);
 });`,
       }),
+      req("List Guest Buyers", "GET", "/admin/guest-buyers?sort=-totalSpent&page=1&pageSize=20", {
+        desc: "Orders placed without an account, grouped by email. `hasAccount` is true when that email registered later; those earlier orders stay unlinked.",
+        test: `
+${status(200)}
+${pagination}
+const rows = pm.response.json().data;
+pm.test("row shape", function () { rows.forEach(function (g) { pm.expect(g).to.include.all.keys("email", "orderCount", "paidOrderCount", "totalSpentCents", "firstOrderAt", "lastOrderAt", "hasAccount"); }); });
+pm.test("sorted by spend", function () { for (let i = 1; i < rows.length; i++) pm.expect(rows[i - 1].totalSpentCents).to.be.at.least(rows[i].totalSpentCents); });`,
+      }),
+      req("List Guest Buyers - Invalid Sort", "GET", "/admin/guest-buyers?sort=name", { test: status(400) }),
       req("Get Customer", "GET", "/admin/customers/{{customerId}}", {
         pre: guard({ needs: ["adminToken", "customerId"] }),
         test: `

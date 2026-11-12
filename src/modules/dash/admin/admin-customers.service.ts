@@ -10,7 +10,11 @@ import type { DocumentsService } from "../../documents/index.ts";
 import type { NotificationsService } from "../../notifications/index.ts";
 import type { OrdersService } from "../../orders/index.ts";
 import type { SubscriptionsService } from "../../subscriptions/index.ts";
-import type { AdminCustomerFilter, AdminCustomerRepository } from "./repositories/admin-customer.repository.ts";
+import type {
+  AdminCustomerFilter,
+  AdminCustomerRepository,
+  GuestBuyerFilter,
+} from "./repositories/admin-customer.repository.ts";
 
 interface Deps {
   customers: AdminCustomerRepository;
@@ -33,6 +37,11 @@ export class AdminCustomersService {
 
   async list(filter: AdminCustomerFilter, page: PageRequest) {
     const { items, total } = await this.d.customers.list(filter, page);
+    return toPage(items, total, page);
+  }
+
+  async listGuests(filter: GuestBuyerFilter, page: PageRequest) {
+    const { items, total } = await this.d.customers.listGuests(filter, page);
     return toPage(items, total, page);
   }
 

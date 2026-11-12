@@ -25,6 +25,15 @@ export const customersQuery = z.object({
   sort: z.enum(["-createdAt", "-lifetimeSpend"]).default("-createdAt").transform((s) => (s === "-lifetimeSpend" ? "lifetimeSpend" : "createdAt") as "createdAt" | "lifetimeSpend"),
 });
 
+export const guestBuyersQuery = z.object({
+  ...paginationQuery,
+  q,
+  sort: z
+    .enum(["-lastOrder", "-totalSpent"])
+    .default("-lastOrder")
+    .transform((s) => (s === "-totalSpent" ? "totalSpent" : "lastOrder") as "lastOrder" | "totalSpent"),
+});
+
 export const updateCustomerBody = z
   .object({ status: z.enum(["active", "suspended"]), reason: z.string().trim().max(500).optional() })
   .strict();

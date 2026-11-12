@@ -7069,6 +7069,61 @@
           "response": []
         },
         {
+          "name": "Customer → Admin Guest Buyers",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let skipReason = \"\";",
+                  "const missing = [\"customerToken\"].filter(function (v) { return !pm.variables.get(v); });",
+                  "if (missing.length) skipReason = \"set \" + missing.join(\", \") + \" first\";",
+                  "if (skipReason) { console.warn(\"Skipped \\\"\" + pm.info.requestName + \"\\\": \" + skipReason); pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"error code is FORBIDDEN\", function () { pm.expect(pm.response.json().code).to.eql(\"FORBIDDEN\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/{{apiVersion}}/admin/guest-buyers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "{{apiVersion}}",
+                "admin",
+                "guest-buyers"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "**Access:** Customer (Bearer)"
+          },
+          "response": []
+        },
+        {
           "name": "Customer → Admin Product Update",
           "event": [
             {
@@ -7875,6 +7930,102 @@
                         {
                           "key": "pageSize",
                           "value": "10"
+                        }
+                      ]
+                    },
+                    "description": ""
+                  },
+                  "response": []
+                },
+                {
+                  "name": "List Guest Buyers",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+                          "",
+                          "pm.test(\"list envelope with pagination meta\", function () {",
+                          "const b = pm.response.json();",
+                          "pm.expect(b.data).to.be.an(\"array\");",
+                          "pm.expect(b.meta).to.include.all.keys(\"page\", \"pageSize\", \"totalItems\", \"totalPages\");",
+                          "pm.expect(b.meta.page).to.eql(Number(pm.request.url.query.get(\"page\") || 1));",
+                          "pm.expect(b.data.length).to.be.at.most(b.meta.pageSize);",
+                          "pm.expect(b.meta.totalPages).to.eql(Math.ceil(b.meta.totalItems / b.meta.pageSize));",
+                          "});",
+                          "const rows = pm.response.json().data;",
+                          "pm.test(\"row shape\", function () { rows.forEach(function (g) { pm.expect(g).to.include.all.keys(\"email\", \"orderCount\", \"paidOrderCount\", \"totalSpentCents\", \"firstOrderAt\", \"lastOrderAt\", \"hasAccount\"); }); });",
+                          "pm.test(\"sorted by spend\", function () { for (let i = 1; i < rows.length; i++) pm.expect(rows[i - 1].totalSpentCents).to.be.at.least(rows[i].totalSpentCents); });"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/{{apiVersion}}/admin/guest-buyers?sort=-totalSpent&page=1&pageSize=20",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "{{apiVersion}}",
+                        "admin",
+                        "guest-buyers"
+                      ],
+                      "query": [
+                        {
+                          "key": "sort",
+                          "value": "-totalSpent"
+                        },
+                        {
+                          "key": "page",
+                          "value": "1"
+                        },
+                        {
+                          "key": "pageSize",
+                          "value": "20"
+                        }
+                      ]
+                    },
+                    "description": "Orders placed without an account, grouped by email. `hasAccount` is true when that email registered later; those earlier orders stay unlinked."
+                  },
+                  "response": []
+                },
+                {
+                  "name": "List Guest Buyers - Invalid Sort",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"status is 400\", function () { pm.response.to.have.status(400); });"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/{{apiVersion}}/admin/guest-buyers?sort=name",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "{{apiVersion}}",
+                        "admin",
+                        "guest-buyers"
+                      ],
+                      "query": [
+                        {
+                          "key": "sort",
+                          "value": "name"
                         }
                       ]
                     },

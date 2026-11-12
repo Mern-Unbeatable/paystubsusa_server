@@ -1,7 +1,13 @@
 import { Prisma } from "../../../../generated/prisma/client.ts";
 import { prisma } from "../../../../shared/db/prisma.ts";
 import { skipTake, type PageRequest } from "../../../../shared/http/pagination.ts";
-import type { AdminCustomerFilter, AdminCustomerRepository, AdminCustomerRow } from "./admin-customer.repository.ts";
+import type {
+  AdminCustomerFilter,
+  AdminCustomerRepository,
+  AdminCustomerRow,
+  GuestBuyerFilter,
+  GuestBuyerRow,
+} from "./admin-customer.repository.ts";
 
 const columns = Prisma.sql`
   u.id, u.name, u.email, u.phone, u.status, u.email_verified_at AS "emailVerifiedAt",
@@ -34,6 +40,36 @@ export class PrismaAdminCustomerRepository implements AdminCustomerRepository {
     const [items, [count]] = await Promise.all([
       prisma.$queryRaw<AdminCustomerRow[]>`SELECT ${columns} FROM users u WHERE ${where} ORDER BY ${order} LIMIT ${take} OFFSET ${skip}`,
       prisma.$queryRaw<{ total: number }[]>`SELECT count(*)::int AS total FROM users u WHERE ${where}`,
+    ]);
+    return { items, total: count?.total ?? 0 };
+  }
+
+  async listGuests(filter: GuestBuyerFilter, page: PageRequest) {
+    const q = filter.q?.trim();
+    const where = Prisma.sql`o.user_id IS NULL ${q ? Prisma.sql`AND o.email ILIKE ${`%${q}%`}` : Prisma.empty}`;
+    const order =
+      filter.sort === "totalSpent" ? Prisma.sql`"totalSpentCents" DESC, email` : Prisma.sql`"lastOrderAt" DESC, email`;
+    const { skip, take } = skipTake(page);
+    const [items, [count]] = await Promise.all([
+      prisma.$queryRaw<GuestBuyerRow[]>`
+        SELECT g.*, EXISTS (SELECT 1 FROM users u WHERE u.email = g.email) AS "hasAccount"
+        FROM (
+          SELECT lower(o.email) AS email,
+            count(*)::int AS "orderCount",
+            (count(*) FILTER (WHERE o.status IN ('paid', 'partially_refunded', 'refunded')))::int AS "paidOrderCount",
+            COALESCE(SUM(pp.net), 0)::int AS "totalSpentCents",
+            min(o.created_at) AS "firstOrderAt",
+            max(o.created_at) AS "lastOrderAt"
+          FROM orders o
+          LEFT JOIN LATERAL (
+            SELECT SUM(p.amount_cents - p.amount_refunded_cents) AS net FROM payments p
+            WHERE p.order_id = o.id AND p.status IN ('succeeded', 'partially_refunded', 'refunded')
+          ) pp ON true
+          WHERE ${where}
+          GROUP BY lower(o.email)
+        ) g
+        ORDER BY ${order} LIMIT ${take} OFFSET ${skip}`,
+      prisma.$queryRaw<{ total: number }[]>`SELECT count(DISTINCT lower(o.email))::int AS total FROM orders o WHERE ${where}`,
     ]);
     return { items, total: count?.total ?? 0 };
   }

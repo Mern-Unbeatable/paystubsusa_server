@@ -20,6 +20,7 @@ export function adminRoutes(c: AdminController, users: UserRepository, idempoten
   router.get("/admin/customers", c.listCustomers);
   router.get("/admin/customers/:id", c.getCustomer);
   router.patch("/admin/customers/:id", fresh, c.updateCustomer);
+  router.get("/admin/guest-buyers", c.listGuestBuyers);
 
   router.get("/admin/orders", c.listOrders);
   router.get("/admin/orders/:id", c.getOrder);

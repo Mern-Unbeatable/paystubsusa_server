@@ -22,6 +22,7 @@ import {
   createTemplateBody,
   customersQuery,
   dashboardQuery,
+  guestBuyersQuery,
   idParams,
   productParams,
   refundBody,
@@ -59,6 +60,11 @@ export class AdminController {
   listCustomers = async (req: Request, res: Response) => {
     const { page, pageSize, ...filter } = parse(customersQuery, req.query);
     res.json(await this.d.customers.list(filter, { page, pageSize }));
+  };
+
+  listGuestBuyers = async (req: Request, res: Response) => {
+    const { page, pageSize, ...filter } = parse(guestBuyersQuery, req.query);
+    res.json(await this.d.customers.listGuests(filter, { page, pageSize }));
   };
 
   getCustomer = async (req: Request, res: Response) => {
