@@ -27,6 +27,17 @@ export class FakeGateway implements PaymentGateway {
   async getClientSecret(id: string) {
     return `${id}_secret_test`;
   }
+  async retrievePaymentIntent(id: string) {
+    const intent = this.intents.get(id);
+    return {
+      id,
+      status: "requires_payment_method",
+      amount: intent?.amountCents ?? 0,
+      amount_received: 0,
+      currency: "usd",
+      metadata: { orderId: intent?.orderId ?? "" },
+    } as unknown as Stripe.PaymentIntent;
+  }
   async cancelPaymentIntent() {
     return true;
   }

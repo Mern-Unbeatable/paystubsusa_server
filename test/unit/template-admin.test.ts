@@ -128,12 +128,18 @@ describe("CatalogService admin template rules", () => {
   });
 
   it.each([
-    ["a built-in template", row("01")],
-    ["a template used by documents", row("custom-1", { usage: { documents: 1 } })],
+    ["a built-in template used by documents", row("01", { usage: { documents: 1 } })],
+    ["a custom template used by documents", row("custom-1", { usage: { documents: 1 } })],
   ])("locks the layout of %s", async (_label, t) => {
     const { service, repo } = setup([t]);
     await expect(service.updateTemplate(t.id, { variant })).rejects.toMatchObject({ status: 409, code: "TEMPLATE_LAYOUT_LOCKED" });
     expect(repo.update).not.toHaveBeenCalled();
+  });
+
+  it("restyles an unused built-in template", async () => {
+    const { service, repo } = setup([row("01")]);
+    await service.updateTemplate("id-01", { variant: themed });
+    expect(repo.update).toHaveBeenCalledWith("id-01", { variant: themed });
   });
 
   it("saves a theme on an editable styled template", async () => {

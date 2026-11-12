@@ -58,6 +58,26 @@ export class WebhookService {
     return { duplicate: false };
   }
 
+  /**
+   * Fallback when the webhook is missed or late: asks Stripe directly whether an open PaymentIntent
+   * succeeded and, if so, runs the same verified fulfilment. Returns true when it fulfilled or found it paid.
+   */
+  async reconcileOrder(orderId: string): Promise<boolean> {
+    try {
+      for (const p of await this.d.payments.listForOrder(orderId)) {
+        if (p.status !== "requires_payment" && p.status !== "processing" && p.status !== "failed") continue;
+        const pi = await this.d.gateway.retrievePaymentIntent(p.providerPaymentId);
+        if (pi.status !== "succeeded" || pi.metadata?.["orderId"] !== orderId) continue;
+        const pre = { card: await this.d.gateway.getCardDetails(pi.id) };
+        await this.d.tx.run((tx) => this.paymentSucceeded(pi, pre, tx));
+        return true;
+      }
+    } catch (err) {
+      logger.warn({ err, orderId }, "Payment reconciliation failed");
+    }
+    return false;
+  }
+
   private async prefetch(event: StripeEvent): Promise<Prefetched> {
     switch (event.type) {
       case "payment_intent.succeeded":

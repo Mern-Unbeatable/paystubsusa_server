@@ -31,6 +31,7 @@ export interface PaymentGateway {
     idempotencyKey: string;
   }): Promise<{ id: string; clientSecret: string }>;
   getClientSecret(paymentIntentId: string): Promise<string>;
+  retrievePaymentIntent(paymentIntentId: string): Promise<Stripe.PaymentIntent>;
   /** Best effort; returns false if Stripe refuses (e.g. it already succeeded). */
   cancelPaymentIntent(paymentIntentId: string): Promise<boolean>;
   getCardDetails(paymentIntentId: string): Promise<CardDetails>;
@@ -89,6 +90,7 @@ export class StripeGateway implements PaymentGateway {
         currency: input.currency,
         customer: input.customerId ?? undefined,
         automatic_payment_methods: { enabled: true },
+        excluded_payment_method_types: ["cashapp", "amazon_pay"],
         metadata: { orderId: input.orderId },
       },
       { idempotencyKey: input.idempotencyKey },
@@ -101,6 +103,10 @@ export class StripeGateway implements PaymentGateway {
     const pi = await this.stripe.paymentIntents.retrieve(paymentIntentId);
     if (!pi.client_secret) throw new Error("Stripe returned no client secret");
     return pi.client_secret;
+  }
+
+  retrievePaymentIntent(paymentIntentId: string) {
+    return this.stripe.paymentIntents.retrieve(paymentIntentId);
   }
 
   async cancelPaymentIntent(paymentIntentId: string) {

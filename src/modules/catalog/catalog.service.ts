@@ -25,9 +25,8 @@ import type {
 export const MAX_ADDITIONAL_PAYSTUBS = 50;
 
 /**
- * Seeded templates the generator falls back to by code from its own bundle when the API is
- * unreachable; their layout must keep matching it, so they can be renamed or deactivated
- * but never restyled or deleted.
+ * Seeded templates the generator also bundles (by code) as its offline fallback; they can be
+ * restyled while unused, but never deleted. A restyle shows only when the API is reachable.
  */
 const SYSTEM_TEMPLATE_KEYS: ReadonlySet<string> = new Set([
   ...["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"].map((code) => `paystub:${code}`),
@@ -41,7 +40,7 @@ export const isSystemTemplate = (t: { documentType: DocumentType; code: string }
 
 /** Issued documents re-render from the template on regeneration, so a used layout is frozen. */
 export const canEditTemplateLayout = (t: TemplateWithUsage) =>
-  !isSystemTemplate(t) && !VARIANTLESS_RENDERERS.has(t.renderer) && t.usage.documents === 0;
+  !VARIANTLESS_RENDERERS.has(t.renderer) && t.usage.documents === 0;
 
 export const canDeleteTemplate = (t: TemplateWithUsage) => !isSystemTemplate(t) && !t.isDefault && t.usage.documents === 0;
 
@@ -287,7 +286,7 @@ export class CatalogService {
     if (input.variant && !canEditTemplateLayout(t)) {
       throw conflict(
         "TEMPLATE_LAYOUT_LOCKED",
-        "This template's layout can't be changed because it is a built-in template or documents were issued with it; create a new template instead",
+        "This template's layout can't be changed because documents were issued with it; create a new template instead",
       );
     }
     if (input.variant?.theme && t.renderer !== THEMEABLE_RENDERER) throw themeUnsupported();
