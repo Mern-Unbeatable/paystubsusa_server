@@ -57,6 +57,7 @@ export function adminRoutes(c: AdminController, users: UserRepository, idempoten
   router.post("/admin/contact-messages", fresh, c.createContactMessage);
   router.patch("/admin/contact-messages/:id", fresh, c.updateContactMessage);
   router.delete("/admin/contact-messages/:id", fresh, c.deleteContactMessage);
+  router.post("/admin/contact-messages/:id/reply", fresh, idempotency(idempotencyRepo, "admin.contact_reply"), c.replyContactMessage);
 
   router.get("/admin/audit-logs", c.listAuditLogs);
 

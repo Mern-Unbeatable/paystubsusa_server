@@ -216,6 +216,29 @@ export const emailTemplates = {
       tag: "contact",
     };
   },
+
+  /** Support's answer to a contact message; the customer's reply goes back to the support inbox. */
+  contact_reply: (p: { name: string; subject: string; reply: string; originalMessage: string; supportEmail: string }): Rendered => {
+    const firstName = p.name.trim().split(/\s+/)[0] || p.name;
+    return {
+      subject: `Re: ${p.subject}`,
+      text: `Hi ${firstName},\n\n${p.reply}\n\nPaystubs USA Support\n\n--- Your message ---\n${p.originalMessage}`,
+      html: cardLayout(
+        "Reply from Paystubs USA support",
+        `<p style="margin:0 0 20px;font-size:15px;line-height:22px;color:#1f2937;text-align:left">Hi ${esc(firstName)},</p>` +
+          `<div style="margin:0 0 24px;font-size:15px;line-height:23px;color:#1f2937;text-align:left;white-space:pre-wrap;word-break:break-word">${esc(p.reply)}</div>` +
+          `<p style="margin:0 0 28px;font-size:15px;line-height:22px;color:#1f2937;text-align:left">Paystubs USA Support</p>` +
+          `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:12px;text-align:left;border-collapse:separate">` +
+          `<tr><td style="padding:14px 20px;border-bottom:1px solid #e5e7eb;border-radius:12px 12px 0 0;background:#f9fafb;font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Your message: ${esc(p.subject)}</td></tr>` +
+          `<tr><td style="padding:16px 20px"><div style="padding:14px 16px;background:#f9fafb;border-left:4px solid #cbd5e1;border-radius:8px;font-size:14px;line-height:21px;color:#4b5563;white-space:pre-wrap;word-break:break-word">${esc(p.originalMessage)}</div></td></tr></table>` +
+          `<p style="margin:20px 0 0;font-size:13px;line-height:20px;color:#6b7280">Need more help? Just reply to this email.</p>`,
+        `<table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto 16px"><tr>` +
+          `<td style="width:56px;height:56px;background:#dbeafe;border-radius:28px;text-align:center;line-height:56px;font-size:26px;color:#1d4ed8">&#9993;</td></tr></table>`,
+      ),
+      replyTo: p.supportEmail,
+      tag: "contact-reply",
+    };
+  },
 } as const;
 
 export type EmailTemplateName = keyof typeof emailTemplates;

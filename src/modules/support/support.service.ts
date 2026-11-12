@@ -55,6 +55,25 @@ export class SupportService {
     return updated;
   }
 
+  /** Emails the reply to the sender and marks the message handled, in one transaction. */
+  async reply(principal: Principal, id: string, reply: string, ctx: RequestContext) {
+    const found = await this.messages.findById(id);
+    if (!found) throw notFound("CONTACT_MESSAGE_NOT_FOUND", "Message not found");
+    const updated = await this.tx.run(async (tx) => {
+      await this.notifications.enqueue(
+        "contact_reply",
+        found.email,
+        { name: found.name, subject: found.subject, reply, originalMessage: found.message, supportEmail: env.SUPPORT_EMAIL },
+        { tx },
+      );
+      return this.messages.update(id, { status: "handled" }, tx);
+    });
+    if (!updated) throw notFound("CONTACT_MESSAGE_NOT_FOUND", "Message not found");
+    // Length only: the reply text stays out of the audit log.
+    await this.audit.record({ ...actorOf(principal), action: "contact_message.reply", targetType: "contact_message", targetId: id, metadata: { replyLength: reply.length }, ip: ctx.ip });
+    return updated;
+  }
+
   async remove(principal: Principal, id: string, ctx: RequestContext) {
     if (!(await this.messages.delete(id))) throw notFound("CONTACT_MESSAGE_NOT_FOUND", "Message not found");
     await this.audit.record({ ...actorOf(principal), action: "contact_message.delete", targetType: "contact_message", targetId: id, ip: ctx.ip });

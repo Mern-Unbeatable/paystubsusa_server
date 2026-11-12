@@ -9511,7 +9511,7 @@
             },
             {
               "name": "Contact Messages",
-              "description": "Support inbox (spec §9.10), shown at /admin/contacts. Filters: `status` (new | handled) and `q` (name, email or subject). Create, edit and delete need a fresh admin role check; the audit log records which fields changed, never their content.",
+              "description": "Support inbox (spec §9.10), shown at /admin/contacts. Filters: `status` (new | handled) and `q` (name, email or subject). Create, status change and delete need a fresh admin role check. Message text can't be edited.",
               "item": [
                 {
                   "name": "List New Contact Messages",
@@ -9742,68 +9742,7 @@
                   "response": []
                 },
                 {
-                  "name": "Edit Contact Message",
-                  "event": [
-                    {
-                      "listen": "prerequest",
-                      "script": {
-                        "type": "text/javascript",
-                        "exec": [
-                          "let skipReason = \"\";",
-                          "const missing = [\"adminToken\",\"adminContactMessageId\"].filter(function (v) { return !pm.variables.get(v); });",
-                          "if (missing.length) skipReason = \"set \" + missing.join(\", \") + \" first\";",
-                          "if (skipReason) { console.warn(\"Skipped \\\"\" + pm.info.requestName + \"\\\": \" + skipReason); pm.execution.skipRequest(); }"
-                        ]
-                      }
-                    },
-                    {
-                      "listen": "test",
-                      "script": {
-                        "type": "text/javascript",
-                        "exec": [
-                          "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
-                          "const m = pm.response.json().data;",
-                          "pm.test(\"edited\", function () { pm.expect(m.subject).to.include(\"(edited)\"); pm.expect(m.status).to.eql(\"handled\"); });"
-                        ]
-                      }
-                    }
-                  ],
-                  "request": {
-                    "method": "PATCH",
-                    "header": [
-                      {
-                        "key": "Content-Type",
-                        "value": "application/json"
-                      }
-                    ],
-                    "url": {
-                      "raw": "{{baseUrl}}/api/{{apiVersion}}/admin/contact-messages/{{adminContactMessageId}}",
-                      "host": [
-                        "{{baseUrl}}"
-                      ],
-                      "path": [
-                        "api",
-                        "{{apiVersion}}",
-                        "admin",
-                        "contact-messages",
-                        "{{adminContactMessageId}}"
-                      ]
-                    },
-                    "body": {
-                      "mode": "raw",
-                      "raw": "{\n  \"subject\": \"Postman admin-logged message (edited)\",\n  \"status\": \"handled\"\n}",
-                      "options": {
-                        "raw": {
-                          "language": "json"
-                        }
-                      }
-                    },
-                    "description": ""
-                  },
-                  "response": []
-                },
-                {
-                  "name": "Edit Contact Message - Empty Body",
+                  "name": "Update Contact Message - Text Fields Rejected",
                   "event": [
                     {
                       "listen": "prerequest",
@@ -9850,7 +9789,136 @@
                     },
                     "body": {
                       "mode": "raw",
-                      "raw": "{}",
+                      "raw": "{\n  \"subject\": \"Edited subject\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "description": "Only `status` can change; message text is never edited."
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Reply to Contact Message",
+                  "event": [
+                    {
+                      "listen": "prerequest",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "let skipReason = \"\";",
+                          "const missing = [\"adminToken\",\"adminContactMessageId\"].filter(function (v) { return !pm.variables.get(v); });",
+                          "if (missing.length) skipReason = \"set \" + missing.join(\", \") + \" first\";",
+                          "if (skipReason) { console.warn(\"Skipped \\\"\" + pm.info.requestName + \"\\\": \" + skipReason); pm.execution.skipRequest(); }"
+                        ]
+                      }
+                    },
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+                          "pm.test(\"marked handled\", function () { pm.expect(pm.response.json().data.status).to.eql(\"handled\"); });"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Idempotency-Key",
+                        "value": "{{$guid}}"
+                      },
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/{{apiVersion}}/admin/contact-messages/{{adminContactMessageId}}/reply",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "{{apiVersion}}",
+                        "admin",
+                        "contact-messages",
+                        "{{adminContactMessageId}}",
+                        "reply"
+                      ]
+                    },
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"message\": \"Thanks for reaching out. This is a reply from the Postman collection.\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "description": "Emails the reply to the sender (template `contact_reply`, Reply-To: support inbox) and marks the message handled. Requires an `Idempotency-Key` header; the audit log stores only the reply length."
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Reply to Contact Message - Empty Reply",
+                  "event": [
+                    {
+                      "listen": "prerequest",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "let skipReason = \"\";",
+                          "const missing = [\"adminToken\",\"adminContactMessageId\"].filter(function (v) { return !pm.variables.get(v); });",
+                          "if (missing.length) skipReason = \"set \" + missing.join(\", \") + \" first\";",
+                          "if (skipReason) { console.warn(\"Skipped \\\"\" + pm.info.requestName + \"\\\": \" + skipReason); pm.execution.skipRequest(); }"
+                        ]
+                      }
+                    },
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"status is 400\", function () { pm.response.to.have.status(400); });"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Idempotency-Key",
+                        "value": "{{$guid}}"
+                      },
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/{{apiVersion}}/admin/contact-messages/{{adminContactMessageId}}/reply",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "{{apiVersion}}",
+                        "admin",
+                        "contact-messages",
+                        "{{adminContactMessageId}}",
+                        "reply"
+                      ]
+                    },
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"message\": \"   \"\n}",
                       "options": {
                         "raw": {
                           "language": "json"

@@ -1479,7 +1479,7 @@ pm.environment.set("adminTemplateSortOrder", String(def.sortOrder));`,
         test: error(422, "VALIDATION_ERROR"),
       }),
     ]),
-    folder("Contact Messages", "Support inbox (spec §9.10), shown at /admin/contacts. Filters: `status` (new | handled) and `q` (name, email or subject). Create, edit and delete need a fresh admin role check; the audit log records which fields changed, never their content.", [
+    folder("Contact Messages", "Support inbox (spec §9.10), shown at /admin/contacts. Filters: `status` (new | handled) and `q` (name, email or subject). Create, status change and delete need a fresh admin role check. Message text can't be edited.", [
       req("List New Contact Messages", "GET", "/admin/contact-messages?status=new&page=1&pageSize=20", {
         test: `
 ${status(200)}
@@ -1509,14 +1509,23 @@ pm.test("matches name, email or subject", function () {
         body: { name: "QA Phone Caller", email: "qa.phone@example.test", subject: "Postman admin-logged message", message: "Logged by an admin from the Postman collection.", status: "new" },
         test: `${status(201)}\nconst m = pm.response.json().data;\npm.test("created as new", function () { pm.expect(m.status).to.eql("new"); });\npm.environment.set("adminContactMessageId", m.id);`,
       }),
-      req("Edit Contact Message", "PATCH", "/admin/contact-messages/{{adminContactMessageId}}", {
+      req("Update Contact Message - Text Fields Rejected", "PATCH", "/admin/contact-messages/{{adminContactMessageId}}", {
+        desc: "Only `status` can change; message text is never edited.",
         pre: guard({ needs: ["adminToken", "adminContactMessageId"] }),
-        body: { subject: "Postman admin-logged message (edited)", status: "handled" },
-        test: `${status(200)}\nconst m = pm.response.json().data;\npm.test("edited", function () { pm.expect(m.subject).to.include("(edited)"); pm.expect(m.status).to.eql("handled"); });`,
+        body: { subject: "Edited subject" },
+        test: status(400),
       }),
-      req("Edit Contact Message - Empty Body", "PATCH", "/admin/contact-messages/{{adminContactMessageId}}", {
+      req("Reply to Contact Message", "POST", "/admin/contact-messages/{{adminContactMessageId}}/reply", {
+        desc: "Emails the reply to the sender (template `contact_reply`, Reply-To: support inbox) and marks the message handled. Requires an `Idempotency-Key` header; the audit log stores only the reply length.",
         pre: guard({ needs: ["adminToken", "adminContactMessageId"] }),
-        body: {},
+        headers: { "Idempotency-Key": "{{$guid}}" },
+        body: { message: "Thanks for reaching out. This is a reply from the Postman collection." },
+        test: `${status(200)}\npm.test("marked handled", function () { pm.expect(pm.response.json().data.status).to.eql("handled"); });`,
+      }),
+      req("Reply to Contact Message - Empty Reply", "POST", "/admin/contact-messages/{{adminContactMessageId}}/reply", {
+        pre: guard({ needs: ["adminToken", "adminContactMessageId"] }),
+        headers: { "Idempotency-Key": "{{$guid}}" },
+        body: { message: "   " },
         test: status(400),
       }),
       req("Delete Contact Message", "DELETE", "/admin/contact-messages/{{adminContactMessageId}}", {

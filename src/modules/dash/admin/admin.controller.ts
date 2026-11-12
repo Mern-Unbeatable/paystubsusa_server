@@ -8,7 +8,7 @@ import type { DocumentsService } from "../../documents/index.ts";
 import type { OrdersService } from "../../orders/index.ts";
 import { adminListPaymentsQuery, type PaymentsService } from "../../payments/index.ts";
 import { cancelSubscriptionBody, listSubscriptionsQuery, type SubscriptionsService } from "../../subscriptions/index.ts";
-import { createContactMessageBody, listContactMessagesQuery, updateContactMessageBody, type SupportService } from "../../support/index.ts";
+import { createContactMessageBody, listContactMessagesQuery, replyContactMessageBody, updateContactMessageBody, type SupportService } from "../../support/index.ts";
 import type { AdminCustomersService } from "./admin-customers.service.ts";
 import type { AdminDashboardService } from "./admin-dashboard.service.ts";
 import type { AdminOperationsService } from "./admin-operations.service.ts";
@@ -204,6 +204,11 @@ export class AdminController {
   updateContactMessage = async (req: Request, res: Response) => {
     const changes = parse(updateContactMessageBody, req.body);
     res.json({ data: await this.d.support.update(userPrincipal(req), id(req), changes, requestContext(req)) });
+  };
+
+  replyContactMessage = async (req: Request, res: Response) => {
+    const { message } = parse(replyContactMessageBody, req.body);
+    res.json({ data: await this.d.support.reply(userPrincipal(req), id(req), message, requestContext(req)) });
   };
 
   deleteContactMessage = async (req: Request, res: Response) => {

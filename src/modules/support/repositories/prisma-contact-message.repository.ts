@@ -33,9 +33,14 @@ export class PrismaContactMessageRepository implements ContactMessageRepository 
     return { items, total };
   }
 
-  async update(id: string, changes: ContactMessageChanges) {
-    const { count } = await prisma.contactMessage.updateMany({ where: { id }, data: changes });
-    return count ? prisma.contactMessage.findUnique({ where: { id }, select }) : null;
+  findById(id: string) {
+    return prisma.contactMessage.findUnique({ where: { id }, select });
+  }
+
+  async update(id: string, changes: ContactMessageChanges, tx?: Tx) {
+    const db = dbOf(tx);
+    const { count } = await db.contactMessage.updateMany({ where: { id }, data: changes });
+    return count ? db.contactMessage.findUnique({ where: { id }, select }) : null;
   }
 
   async delete(id: string) {

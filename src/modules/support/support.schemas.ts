@@ -31,13 +31,7 @@ const contactFields = {
 /** Admin-logged message (e.g. received by phone); no notification email is sent. */
 export const createContactMessageBody = z.object({ ...contactFields, status: contactStatusEnum.default("new") }).strict();
 
-export const updateContactMessageBody = z
-  .object({
-    name: contactFields.name.optional(),
-    email: contactFields.email.optional(),
-    subject: contactFields.subject.optional(),
-    message: contactFields.message.optional(),
-    status: contactStatusEnum.optional(),
-  })
-  .strict()
-  .refine((body) => Object.values(body).some((v) => v !== undefined), { message: "Nothing to update" });
+export const replyContactMessageBody = z.object({ message: z.string().trim().min(1).max(5000) }).strict();
+
+/** Only the status changes; a customer's message is never rewritten. */
+export const updateContactMessageBody = z.object({ status: contactStatusEnum }).strict();
