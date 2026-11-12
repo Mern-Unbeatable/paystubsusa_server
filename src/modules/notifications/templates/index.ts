@@ -24,7 +24,9 @@ const cardLayout = (title: string, bodyHtml: string, iconHtml = "") =>
   `<p style="margin:0;font-size:12px;color:#9ca3af">&copy; ${new Date().getFullYear()} Paystubs USA. All rights reserved.</p></td></tr>` +
   `</table></td></tr></table></body></html>`;
 
-type Rendered = Omit<OutgoingEmail, "to">;
+/** Attachments are referenced by storage key; the sender loads the bytes, so payloads stay small. */
+export type StoredAttachment = { storageKey: string; fileName: string };
+type Rendered = Omit<OutgoingEmail, "to" | "attachments"> & { attachments?: StoredAttachment[] };
 
 export const emailTemplates = {
   verification_code: (p: { code: string; purpose: "checkout" | "document_access" }): Rendered => {
@@ -168,6 +170,26 @@ export const emailTemplates = {
       tag: "order-receipt",
     };
   },
+
+  documents_ready: (p: { orderNumber: string; title: string; documentsUrl: string; file: StoredAttachment }): Rendered => ({
+    subject: `Your document is ready: ${p.title}`,
+    text:
+      `Your document for order ${p.orderNumber} is ready, and the PDF is attached to this email.\n\n` +
+      `You can also download it any time: ${p.documentsUrl}\n(You'll be asked to sign in or confirm your email.)`,
+    html: cardLayout(
+      "Your document is ready",
+      `<p style="margin:0 0 24px;font-size:15px;line-height:22px;color:#1f2937">Good news! Your document for order <b>${esc(p.orderNumber)}</b> has been generated. The PDF is attached to this email.</p>` +
+        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eff1f0;border-radius:12px;text-align:left"><tr>` +
+        `<td width="44" style="padding:16px 0 16px 20px"><div style="width:40px;height:40px;background:#fee2e2;border-radius:8px;text-align:center;line-height:40px;font-size:11px;font-weight:700;color:#b91c1c">PDF</div></td>` +
+        `<td style="padding:16px 20px 16px 12px"><div style="font-size:15px;font-weight:700;color:#111827">${esc(p.title)}</div>` +
+        `<div style="margin-top:2px;font-size:13px;color:#6b7280;word-break:break-all">${esc(p.file.fileName)}</div></td></tr></table>` +
+        `<div style="margin:22px 0 0;text-align:center">` +
+        `<a href="${esc(p.documentsUrl)}" target="_blank" style="display:inline-block;margin:6px;padding:12px 24px;background:#092258;border:2px solid #092258;border-radius:10px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none">View My Documents</a></div>` +
+        `<p style="margin:24px 0 0;font-size:14px;line-height:21px;color:#6b7280">This document contains personal information. Please keep this email private.</p>`,
+    ),
+    tag: "documents-ready",
+    attachments: [p.file],
+  }),
 
   contact_notification: (p: { name: string; email: string; subject: string; message: string }): Rendered => ({
     subject: `[Contact] ${p.subject}`,

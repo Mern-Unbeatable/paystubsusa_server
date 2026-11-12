@@ -141,6 +141,7 @@ export class PrismaDocumentRepository implements DocumentRepository {
         formDataEnc: true,
         formDataKeyId: true,
         createdAt: true,
+        renderedAt: true,
         template: { select: { code: true, renderer: true, variant: true } },
       },
     });

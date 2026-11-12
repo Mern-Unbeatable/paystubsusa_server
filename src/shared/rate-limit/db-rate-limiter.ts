@@ -1,4 +1,5 @@
 import type { RequestHandler, Request } from "express";
+import { env } from "../../config/env.ts";
 import { prisma } from "../db/prisma.ts";
 import { tooManyRequests } from "../http/app-error.ts";
 import type { RateLimiter, RateLimitResult, RateRule } from "./rate-limiter.ts";
@@ -35,6 +36,7 @@ export class DbRateLimiter implements RateLimiter {
 export const rateLimit =
   (limiter: RateLimiter, rules: (req: Request) => (RateRule | null)[]): RequestHandler =>
   async (req, _res, next) => {
+    if (!env.RATE_LIMIT_ENABLED) return next();
     for (const rule of rules(req)) {
       if (!rule) continue;
       const result = await limiter.hit(rule.key, rule.limit, rule.windowSeconds);

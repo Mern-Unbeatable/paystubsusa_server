@@ -118,6 +118,7 @@ export function createContainer(overrides: Partial<Integrations> = {}) {
     deliveries: new PrismaEmailDeliveryRepository(),
     jobs,
     mailer,
+    storage,
   });
   const verification = new VerificationService({
     challenges,
@@ -135,6 +136,7 @@ export function createContainer(overrides: Partial<Integrations> = {}) {
     storage,
     renderer,
     audit,
+    notifications,
   });
   const payments = new PaymentsService(paymentRepo, gateway);
   const subscriptions = new SubscriptionsService({

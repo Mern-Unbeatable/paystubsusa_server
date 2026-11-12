@@ -11,6 +11,9 @@ import type { Principal, RequestContext } from "../../shared/types.ts";
 import type { ObjectStorage } from "../../integrations/storage.ts";
 import type { DocumentRenderer } from "../../integrations/renderer.ts";
 import { actorOf, type AuditService } from "../audit/index.ts";
+import type { NotificationsService } from "../notifications/notifications.service.ts";
+import { env } from "../../config/env.ts";
+import { logger } from "../../shared/logger.ts";
 import { validateFormData, type DisplayFields } from "./form-data.ts";
 import type { DocumentListFilter, DocumentRepository, DocumentWithOrder } from "./repositories/document.repository.ts";
 
@@ -29,6 +32,7 @@ interface Deps {
   storage: ObjectStorage;
   renderer: DocumentRenderer;
   audit: AuditService;
+  notifications: Pick<NotificationsService, "enqueue">;
 }
 
 const toDetail = (d: DocumentWithOrder) => ({
@@ -192,6 +196,7 @@ export class DocumentsService {
       const key = `documents/${yyyy}/${mm}/${doc.orderId}/${doc.id}.pdf`;
       await this.d.storage.put(key, pdf, "application/pdf");
       await this.d.documents.markReady(doc.id, key, sha256(pdf));
+      if (!doc.renderedAt) await this.emailFirstRender(doc.id);
     } catch (err) {
       if (ctx.isFinalAttempt) {
         await this.d.documents.markFailed(doc.id);
@@ -204,6 +209,27 @@ export class DocumentsService {
         });
       }
       throw err;
+    }
+  }
+
+  /** Sends the PDF to the order's (checkout-verified) email; failures are logged, never block the render. */
+  private async emailFirstRender(documentId: string) {
+    try {
+      const doc = await this.d.documents.findWithOrder(documentId);
+      if (!doc?.pdfStorageKey || doc.status !== "ready" || !DOWNLOADABLE_ORDER_STATUSES.includes(doc.order.status)) return;
+      await this.d.notifications.enqueue(
+        "documents_ready",
+        doc.order.email,
+        {
+          orderNumber: doc.order.orderNumber,
+          title: doc.title,
+          documentsUrl: `${env.APP_URL}/find-paystubs`,
+          file: { storageKey: doc.pdfStorageKey, fileName: doc.fileName },
+        },
+        { relatedOrderId: doc.order.id },
+      );
+    } catch (err) {
+      logger.warn({ documentId, err: err instanceof Error ? err.message : "unknown" }, "Could not queue the document email");
     }
   }
 

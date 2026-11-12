@@ -56,6 +56,8 @@ export interface RenderableDocument {
   formDataEnc: Uint8Array | null;
   formDataKeyId: string | null;
   createdAt: Date;
+  /** Null until the first successful render; regenerations keep it. */
+  renderedAt: Date | null;
   template: { code: string; renderer: string; variant: unknown };
 }
 
