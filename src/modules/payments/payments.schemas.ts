@@ -5,7 +5,7 @@ export const paymentStatusEnum = z.enum(["requires_payment", "processing", "succ
 
 export const paymentIdParams = z.object({ paymentId: z.uuid() });
 
-export const listPaymentsQuery = z.object({ ...paginationQuery });
+export const listPaymentsQuery = z.object({ ...paginationQuery, status: paymentStatusEnum.optional() });
 
 export const adminListPaymentsQuery = z.object({
   ...paginationQuery,

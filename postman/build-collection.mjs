@@ -978,13 +978,13 @@ pm.test("null or the subscription shape", function () {
   folder("Create Checkout", "", [
     req("Create Checkout Session", "POST", "/me/subscription/checkout-session", {
       auth: "customer",
-      desc: "201 `{data:{url}}` (Stripe Checkout). 409 `SUBSCRIPTION_ACTIVE` if already subscribed; 503 `SUBSCRIPTION_UNAVAILABLE` when the plan has no Stripe price.",
+      desc: "201 `{data:{clientSecret}}` (Stripe Checkout Session for the Payment Element in the app). 409 `SUBSCRIPTION_ACTIVE` if already subscribed; 503 `SUBSCRIPTION_UNAVAILABLE` when the plan has no Stripe price.",
       pre: guard({ needs: ["customerToken"] }),
       test: `
-pm.test("checkout URL, or a documented refusal", function () {
+pm.test("checkout client secret, or a documented refusal", function () {
   pm.expect(pm.response.code).to.be.oneOf([201, 409, 503]);
   const b = pm.response.json();
-  if (pm.response.code === 201) pm.expect(b.data.url).to.match(/^https:\\/\\//);
+  if (pm.response.code === 201) pm.expect(b.data.clientSecret).to.be.a("string").and.not.empty;
   if (pm.response.code === 409) pm.expect(b.code).to.eql("SUBSCRIPTION_ACTIVE");
   if (pm.response.code === 503) pm.expect(b.code).to.eql("SUBSCRIPTION_UNAVAILABLE");
 });`,
@@ -1193,6 +1193,7 @@ pm.variables.set("forgedToken", [b64url({ alg: "EdDSA" }), b64url({ sub: "forged
       test: error(404, "ORDER_NOT_FOUND"),
     }),
     req("Customer → Admin Customers", "GET", "/admin/customers", { auth: "customer", pre: guard({ needs: ["customerToken"] }), test: error(403, "FORBIDDEN") }),
+    req("Customer → Admin Guest Buyers", "GET", "/admin/guest-buyers", { auth: "customer", pre: guard({ needs: ["customerToken"] }), test: error(403, "FORBIDDEN") }),
     req("Customer → Admin Product Update", "PATCH", "/admin/products/paystub_single", {
       auth: "customer",
       pre: guard({ needs: ["customerToken"] }),
@@ -1306,6 +1307,16 @@ pm.test("sorted by spend, active only", function () {
   for (let i = 1; i < rows.length; i++) pm.expect(rows[i - 1].lifetimeSpendCents).to.be.at.least(rows[i].lifetimeSpendCents);
 });`,
       }),
+      req("List Guest Buyers", "GET", "/admin/guest-buyers?sort=-totalSpent&page=1&pageSize=20", {
+        desc: "Orders placed without an account, grouped by email. `hasAccount` is true when that email registered later; those earlier orders stay unlinked.",
+        test: `
+${status(200)}
+${pagination}
+const rows = pm.response.json().data;
+pm.test("row shape", function () { rows.forEach(function (g) { pm.expect(g).to.include.all.keys("email", "orderCount", "paidOrderCount", "totalSpentCents", "firstOrderAt", "lastOrderAt", "hasAccount"); }); });
+pm.test("sorted by spend", function () { for (let i = 1; i < rows.length; i++) pm.expect(rows[i - 1].totalSpentCents).to.be.at.least(rows[i].totalSpentCents); });`,
+      }),
+      req("List Guest Buyers - Invalid Sort", "GET", "/admin/guest-buyers?sort=name", { test: status(400) }),
       req("Get Customer", "GET", "/admin/customers/{{customerId}}", {
         pre: guard({ needs: ["adminToken", "customerId"] }),
         test: `
@@ -1349,6 +1360,14 @@ pm.test("customer with orders, documents and subscription", function () {
         pre: guard({ needs: ["adminToken", "customerEmail"] }),
         test: `${status(200)}\n${pagination}\npm.test("matches the email", function () { pm.response.json().data.forEach(function (o) { pm.expect(o.email).to.include(pm.variables.get("customerEmail")); }); });`,
       }),
+      req("List Guest Orders", "GET", "/admin/orders?buyer=guest&page=1&pageSize=20", {
+        desc: "Orders placed without an account (`userId` is null). `buyer=customer` returns account-linked orders.",
+        test: `${status(200)}\n${pagination}\npm.test("all guest orders", function () { pm.response.json().data.forEach(function (o) { pm.expect(o.userId).to.eql(null); }); });`,
+      }),
+      req("List Customer Orders", "GET", "/admin/orders?buyer=customer&page=1&pageSize=20", {
+        test: `${status(200)}\n${pagination}\npm.test("all linked to an account", function () { pm.response.json().data.forEach(function (o) { pm.expect(o.userId).to.be.a("string"); }); });`,
+      }),
+      req("List Orders - Invalid Buyer", "GET", "/admin/orders?buyer=admin", { test: status(400) }),
       req("Get Order Detail", "GET", "/admin/orders/{{orderId}}", {
         pre: guard({ needs: ["adminToken", "orderId"] }),
         test: `
@@ -1479,7 +1498,7 @@ pm.environment.set("adminTemplateSortOrder", String(def.sortOrder));`,
         test: error(422, "VALIDATION_ERROR"),
       }),
     ]),
-    folder("Contact Messages", "Support inbox (spec §9.10; no UI yet).", [
+    folder("Contact Messages", "Support inbox (spec §9.10), shown at /admin/contacts. Filters: `status` (new | handled) and `q` (name, email or subject). Create, status change and delete need a fresh admin role check. Message text can't be edited.", [
       req("List New Contact Messages", "GET", "/admin/contact-messages?status=new&page=1&pageSize=20", {
         test: `
 ${status(200)}
@@ -1489,10 +1508,52 @@ pm.test("all new", function () { rows.forEach(function (m) { pm.expect(m.status)
 const mine = rows.find(function (m) { return m.subject === "Postman contact test"; });
 if (mine) pm.environment.set("contactMessageId", mine.id);`,
       }),
+      req("Search Contact Messages", "GET", "/admin/contact-messages?q=Postman&page=1&pageSize=20", {
+        test: `
+${status(200)}
+${pagination}
+pm.test("matches name, email or subject", function () {
+  pm.response.json().data.forEach(function (m) {
+    pm.expect((m.name + " " + m.email + " " + m.subject).toLowerCase()).to.include("postman");
+  });
+});`,
+      }),
       req("Mark Contact Message Handled", "PATCH", "/admin/contact-messages/{{contactMessageId}}", {
         pre: guard({ needs: ["adminToken", "contactMessageId"] }),
         body: { status: "handled" },
         test: `${status(200)}\npm.test("handled", function () { pm.expect(pm.response.json().data.status).to.eql("handled"); });`,
+      }),
+      req("Create Contact Message (logged by admin)", "POST", "/admin/contact-messages", {
+        desc: "Records a message received another way (phone, email). No notification email is sent.",
+        body: { name: "QA Phone Caller", email: "qa.phone@example.test", subject: "Postman admin-logged message", message: "Logged by an admin from the Postman collection.", status: "new" },
+        test: `${status(201)}\nconst m = pm.response.json().data;\npm.test("created as new", function () { pm.expect(m.status).to.eql("new"); });\npm.environment.set("adminContactMessageId", m.id);`,
+      }),
+      req("Update Contact Message - Text Fields Rejected", "PATCH", "/admin/contact-messages/{{adminContactMessageId}}", {
+        desc: "Only `status` can change; message text is never edited.",
+        pre: guard({ needs: ["adminToken", "adminContactMessageId"] }),
+        body: { subject: "Edited subject" },
+        test: status(400),
+      }),
+      req("Reply to Contact Message", "POST", "/admin/contact-messages/{{adminContactMessageId}}/reply", {
+        desc: "Emails the reply to the sender (template `contact_reply`, Reply-To: support inbox) and marks the message handled. Requires an `Idempotency-Key` header; the audit log stores only the reply length.",
+        pre: guard({ needs: ["adminToken", "adminContactMessageId"] }),
+        headers: { "Idempotency-Key": "{{$guid}}" },
+        body: { message: "Thanks for reaching out. This is a reply from the Postman collection." },
+        test: `${status(200)}\npm.test("marked handled", function () { pm.expect(pm.response.json().data.status).to.eql("handled"); });`,
+      }),
+      req("Reply to Contact Message - Empty Reply", "POST", "/admin/contact-messages/{{adminContactMessageId}}/reply", {
+        pre: guard({ needs: ["adminToken", "adminContactMessageId"] }),
+        headers: { "Idempotency-Key": "{{$guid}}" },
+        body: { message: "   " },
+        test: status(400),
+      }),
+      req("Delete Contact Message", "DELETE", "/admin/contact-messages/{{adminContactMessageId}}", {
+        pre: guard({ needs: ["adminToken", "adminContactMessageId"] }),
+        test: status(204),
+      }),
+      req("Delete Contact Message - Already Deleted", "DELETE", "/admin/contact-messages/{{adminContactMessageId}}", {
+        pre: guard({ needs: ["adminToken", "adminContactMessageId"] }),
+        test: status(404),
       }),
     ]),
     folder("Audit Logs", "", [
@@ -1553,7 +1614,7 @@ const runtimeVars = [
   "orderId", "orderIdempotencyKey", "orderTotalCents", "paymentIntentId", "entitlementId", "documentId", "redeemedDocumentId", "paymentId",
   "guestOrderId", "guestOrderIdempotencyKey", "guestOrderTotalCents", "guestPaymentIntentId", "guestDocumentId",
   "scratchIdempotencyKey", "refundIdempotencyKey", "webhookPayload", "webhookSignature",
-  "subscriptionId", "contactMessageId", "adminTemplateId", "adminTemplateSortOrder",
+  "subscriptionId", "contactMessageId", "adminContactMessageId", "adminTemplateId", "adminTemplateSortOrder",
 ];
 const SECRET = new Set(["customerPassword", "customerNewPassword", "customer2Password", "adminPassword", "stripeWebhookSecret", "customerToken", "customer2Token", "adminToken", "guestToken", "resetToken"]);
 

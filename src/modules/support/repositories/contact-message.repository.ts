@@ -12,9 +12,17 @@ export interface ContactMessageRow {
   createdAt: Date;
 }
 
+export type ContactMessageChanges = Partial<Pick<ContactMessageRow, "name" | "email" | "subject" | "message" | "status">>;
+
 export interface ContactMessageRepository {
-  create(input: { name: string; email: string; subject: string; message: string; ip: string | null }, tx?: Tx): Promise<ContactMessageRow>;
-  list(filter: { status?: ContactStatus }, page: PageRequest): Promise<{ items: ContactMessageRow[]; total: number }>;
+  create(
+    input: { name: string; email: string; subject: string; message: string; ip: string | null; status?: ContactStatus },
+    tx?: Tx,
+  ): Promise<ContactMessageRow>;
+  list(filter: { status?: ContactStatus; q?: string }, page: PageRequest): Promise<{ items: ContactMessageRow[]; total: number }>;
+  findById(id: string): Promise<ContactMessageRow | null>;
   /** null when the message doesn't exist. */
-  setStatus(id: string, status: ContactStatus): Promise<ContactMessageRow | null>;
+  update(id: string, changes: ContactMessageChanges, tx?: Tx): Promise<ContactMessageRow | null>;
+  /** false when the message doesn't exist. */
+  delete(id: string): Promise<boolean>;
 }

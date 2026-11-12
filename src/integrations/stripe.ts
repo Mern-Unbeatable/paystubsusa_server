@@ -21,6 +21,15 @@ export interface GatewaySubscription {
   metadataUserId: string | null;
 }
 
+export interface GatewayInvoice {
+  id: string;
+  status: Stripe.Invoice.Status | null;
+  amountPaid: number;
+  amountDue: number;
+  currency: string;
+  hostedInvoiceUrl: string | null;
+}
+
 /** Everything the app needs from Stripe; tests substitute a fake. */
 export interface PaymentGateway {
   createPaymentIntent(input: {
@@ -31,9 +40,12 @@ export interface PaymentGateway {
     idempotencyKey: string;
   }): Promise<{ id: string; clientSecret: string }>;
   getClientSecret(paymentIntentId: string): Promise<string>;
+  retrievePaymentIntent(paymentIntentId: string): Promise<Stripe.PaymentIntent>;
   /** Best effort; returns false if Stripe refuses (e.g. it already succeeded). */
   cancelPaymentIntent(paymentIntentId: string): Promise<boolean>;
   getCardDetails(paymentIntentId: string): Promise<CardDetails>;
+  /** Card of the payment that settled an invoice; null when it wasn't paid by a PaymentIntent. */
+  getInvoiceCardDetails(invoiceId: string): Promise<CardDetails | null>;
   createRefund(input: {
     paymentIntentId: string;
     amountCents: number | null;
@@ -41,16 +53,19 @@ export interface PaymentGateway {
     orderId: string;
   }): Promise<{ id: string; status: string | null }>;
   createCustomer(input: { userId: string; email: string; name: string }): Promise<string>;
+  /** Checkout Session for the Payment Element (ui_mode "elements"); resolves to its client secret. */
   createSubscriptionCheckout(input: {
     customerId: string;
     priceId: string;
     userId: string;
-    successUrl: string;
-    cancelUrl: string;
+    returnUrl: string;
   }): Promise<string>;
   createPortalSession(input: { customerId: string; returnUrl: string }): Promise<string>;
   cancelSubscription(subscriptionId: string, atPeriodEnd: boolean): Promise<GatewaySubscription>;
   retrieveSubscription(subscriptionId: string): Promise<GatewaySubscription>;
+  /** Webhook fallback: every subscription of one Stripe customer, newest first. */
+  listCustomerSubscriptions(customerId: string): Promise<GatewaySubscription[]>;
+  listSubscriptionInvoices(subscriptionId: string): Promise<GatewayInvoice[]>;
   createPrice(input: {
     previousPriceId: string | null;
     productName: string;
@@ -73,7 +88,8 @@ export function normalizeSubscription(sub: Stripe.Subscription): GatewaySubscrip
     priceId: item?.price.id ?? null,
     currentPeriodStart: toDate(item?.current_period_start),
     currentPeriodEnd: toDate(item?.current_period_end),
-    cancelAtPeriodEnd: sub.cancel_at_period_end,
+    // The Customer Portal schedules period-end cancels via cancel_at and leaves cancel_at_period_end false.
+    cancelAtPeriodEnd: sub.cancel_at_period_end || sub.cancel_at !== null,
     canceledAt: toDate(sub.canceled_at),
     metadataUserId: sub.metadata?.["userId"] ?? null,
   };
@@ -89,6 +105,7 @@ export class StripeGateway implements PaymentGateway {
         currency: input.currency,
         customer: input.customerId ?? undefined,
         automatic_payment_methods: { enabled: true },
+        excluded_payment_method_types: ["cashapp", "amazon_pay"],
         metadata: { orderId: input.orderId },
       },
       { idempotencyKey: input.idempotencyKey },
@@ -101,6 +118,10 @@ export class StripeGateway implements PaymentGateway {
     const pi = await this.stripe.paymentIntents.retrieve(paymentIntentId);
     if (!pi.client_secret) throw new Error("Stripe returned no client secret");
     return pi.client_secret;
+  }
+
+  retrievePaymentIntent(paymentIntentId: string) {
+    return this.stripe.paymentIntents.retrieve(paymentIntentId);
   }
 
   async cancelPaymentIntent(paymentIntentId: string) {
@@ -118,6 +139,12 @@ export class StripeGateway implements PaymentGateway {
     const charge = typeof pi.latest_charge === "object" ? pi.latest_charge : null;
     const card = charge?.payment_method_details?.card;
     return { cardBrand: card?.brand ?? null, cardLast4: card?.last4 ?? null, receiptUrl: charge?.receipt_url ?? null };
+  }
+
+  async getInvoiceCardDetails(invoiceId: string) {
+    const page = await this.stripe.invoicePayments.list({ invoice: invoiceId, status: "paid", limit: 1 });
+    const paymentIntentId = idOf(page.data[0]?.payment.payment_intent);
+    return paymentIntentId ? this.getCardDetails(paymentIntentId) : null;
   }
 
   async createRefund(input: Parameters<PaymentGateway["createRefund"]>[0]) {
@@ -143,16 +170,18 @@ export class StripeGateway implements PaymentGateway {
   async createSubscriptionCheckout(input: Parameters<PaymentGateway["createSubscriptionCheckout"]>[0]) {
     const session = await this.stripe.checkout.sessions.create({
       mode: "subscription",
+      // Payment Element in our own dialog; only redirect-based methods come back via return_url.
+      ui_mode: "elements",
+      return_url: input.returnUrl,
+      excluded_payment_method_types: ["cashapp", "amazon_pay"],
       customer: input.customerId,
       line_items: [{ price: input.priceId, quantity: 1 }],
-      success_url: input.successUrl,
-      cancel_url: input.cancelUrl,
       client_reference_id: input.userId,
       metadata: { userId: input.userId },
       subscription_data: { metadata: { userId: input.userId } },
     });
-    if (!session.url) throw new Error("Stripe returned no checkout URL");
-    return session.url;
+    if (!session.client_secret) throw new Error("Stripe returned no checkout client secret");
+    return session.client_secret;
   }
 
   async createPortalSession(input: { customerId: string; returnUrl: string }) {
@@ -172,6 +201,25 @@ export class StripeGateway implements PaymentGateway {
 
   async retrieveSubscription(subscriptionId: string) {
     return normalizeSubscription(await this.stripe.subscriptions.retrieve(subscriptionId));
+  }
+
+  async listCustomerSubscriptions(customerId: string) {
+    const page = await this.stripe.subscriptions.list({ customer: customerId, status: "all", limit: 20 });
+    return page.data.map(normalizeSubscription);
+  }
+
+  async listSubscriptionInvoices(subscriptionId: string) {
+    const page = await this.stripe.invoices.list({ subscription: subscriptionId, limit: 24 });
+    return page.data
+      .filter((i): i is Stripe.Invoice & { id: string } => Boolean(i.id))
+      .map((i) => ({
+        id: i.id,
+        status: i.status,
+        amountPaid: i.amount_paid,
+        amountDue: i.amount_due,
+        currency: i.currency,
+        hostedInvoiceUrl: i.hosted_invoice_url ?? null,
+      }));
   }
 
   async createPrice(input: Parameters<PaymentGateway["createPrice"]>[0]) {

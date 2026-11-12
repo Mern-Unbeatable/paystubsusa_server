@@ -1,0 +1,68 @@
+{
+"name": "paystubsusa-server",
+"version": "1.0.0",
+"description": "PaystubsUSA API (Express modular monolith)",
+"scripts": {
+"build": "prisma generate",
+"dev": "node --watch --env-file-if-exists=.env src/server.ts",
+"start": "node --env-file-if-exists=.env src/server.ts",
+"typecheck": "tsc --noEmit",
+"test": "vitest run",
+"test:unit": "vitest run test/unit",
+"test:integration": "vitest run test/integration",
+"prisma:generate": "prisma generate",
+"db:migrate": "prisma migrate deploy",
+"db:migrate:dev": "prisma migrate dev",
+"db:seed": "prisma db seed",
+"keys:generate": "node scripts/generate-keys.ts"
+},
+"license": "UNLICENSED",
+"type": "module",
+"dependencies": {
+"@prisma/adapter-pg": "^7.10.1",
+"@prisma/client": "^7.10.1",
+"argon2": "^0.45.2",
+"cookie-parser": "^1.4.7",
+"cors": "^2.8.6",
+"dotenv": "^18.0.10",
+"express": "^5.3.0",
+"express-rate-limit": "^8.7.3",
+"helmet": "^8.3.0",
+"jose": "^6.2.16",
+"multer": "^2.5.0",
+"node-cron": "^4.6.0",
+"nodemailer": "^10.4.0",
+"pg": "^8.23.1",
+"pino": "^10.4.0",
+"pino-http": "^11.0.0",
+"pino-pretty": "^13.2.0",
+"playwright-core": "^1.65.0",
+"sharp": "^0.35.5",
+"stripe": "^23.1.0",
+"zod": "^4.6.7"
+},
+"devDependencies": {
+"@types/cookie-parser": "^1.4.10",
+"@types/cors": "^2.8.19",
+"@types/express": "^5.0.6",
+"@types/multer": "^2.3.0",
+"@types/node": "^26.6.6",
+"@types/nodemailer": "^8.0.2",
+"@types/pg": "^8.23.1",
+"@types/supertest": "^7.2.1",
+"prisma": "^7.10.1",
+"supertest": "^7.3.2",
+"typescript": "^7.0.2",
+"vitest": "^5.1.0"
+},
+"allowScripts": {
+"argon2@0.45.2": true,
+"prisma@7.10.1": true,
+"@prisma/engines@7.10.1": true,
+"esbuild@0.28.2": true
+},
+"private": true,
+"engines": {
+"node": ">=24"
+}
+}

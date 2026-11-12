@@ -31,8 +31,12 @@ export class PrismaSubscriptionRepository implements SubscriptionRepository {
     });
   }
 
-  latestForUser(userId: string) {
-    return prisma.subscription.findFirst({ where: { userId }, include: detailInclude, orderBy: { createdAt: "desc" } });
+  async latestForUser(userId: string) {
+    const newest = { include: detailInclude, orderBy: { createdAt: "desc" } } as const;
+    return (
+      (await prisma.subscription.findFirst({ where: { userId, status: { in: ["active", "past_due"] } }, ...newest })) ??
+      prisma.subscription.findFirst({ where: { userId }, ...newest })
+    );
   }
 
   findDetail(id: string) {
@@ -63,7 +67,7 @@ export class PrismaSubscriptionRepository implements SubscriptionRepository {
   documentsGenerated(sub: SubscriptionRow) {
     return prisma.document.count({
       where: {
-        createdAt: { gte: sub.createdAt, ...(sub.canceledAt ? { lte: sub.canceledAt } : {}) },
+        createdAt: { gte: sub.createdAt, ...(sub.status === "canceled" && sub.canceledAt ? { lte: sub.canceledAt } : {}) },
         order: { userId: sub.userId, items: { some: { productId: sub.productId } } },
       },
     });

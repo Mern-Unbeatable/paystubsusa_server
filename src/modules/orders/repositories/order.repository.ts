@@ -47,6 +47,8 @@ export interface NewOrder {
 export interface OrderListFilter {
   status?: OrderStatus;
   documentType?: DocumentType;
+  /** guest: placed without an account (user_id is null); customer: linked to an account. */
+  buyer?: "guest" | "customer";
   q?: string;
   from?: Date;
   to?: Date;

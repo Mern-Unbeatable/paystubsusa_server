@@ -1,4 +1,5 @@
 import type { UserStatus } from "../../../generated/prisma/enums.ts";
+import { env } from "../../../config/env.ts";
 import type { TransactionManager } from "../../../shared/db/transaction.ts";
 import { forbidden, notFound } from "../../../shared/http/app-error.ts";
 import { toPage, type PageRequest } from "../../../shared/http/pagination.ts";
@@ -6,9 +7,14 @@ import type { Principal, RequestContext } from "../../../shared/types.ts";
 import { actorOf, type AuditService } from "../../audit/index.ts";
 import type { SessionService, UserRepository } from "../../auth/index.ts";
 import type { DocumentsService } from "../../documents/index.ts";
+import type { NotificationsService } from "../../notifications/index.ts";
 import type { OrdersService } from "../../orders/index.ts";
 import type { SubscriptionsService } from "../../subscriptions/index.ts";
-import type { AdminCustomerFilter, AdminCustomerRepository } from "./repositories/admin-customer.repository.ts";
+import type {
+  AdminCustomerFilter,
+  AdminCustomerRepository,
+  GuestBuyerFilter,
+} from "./repositories/admin-customer.repository.ts";
 
 interface Deps {
   customers: AdminCustomerRepository;
@@ -18,6 +24,7 @@ interface Deps {
   documents: DocumentsService;
   subscriptions: SubscriptionsService;
   audit: AuditService;
+  notifications: NotificationsService;
   tx: TransactionManager;
 }
 
@@ -33,6 +40,11 @@ export class AdminCustomersService {
     return toPage(items, total, page);
   }
 
+  async listGuests(filter: GuestBuyerFilter, page: PageRequest) {
+    const { items, total } = await this.d.customers.listGuests(filter, page);
+    return toPage(items, total, page);
+  }
+
   async get(id: string) {
     const customer = await this.d.customers.find(id);
     if (!customer) throw notFound("CUSTOMER_NOT_FOUND", "Customer not found");
@@ -45,7 +57,7 @@ export class AdminCustomersService {
     return { ...customer, orders, documents, subscription };
   }
 
-  /** Suspension revokes every session; admins can't be targeted. */
+  /** Suspension revokes every session; admins can't be targeted. The user is emailed only when the status actually changes. */
   async setStatus(principal: Principal, id: string, input: { status: UserStatus; reason?: string }, ctx: RequestContext) {
     const user = await this.d.users.findById(id);
     if (!user) throw notFound("CUSTOMER_NOT_FOUND", "Customer not found");
@@ -54,6 +66,20 @@ export class AdminCustomersService {
     await this.d.tx.run(async (tx) => {
       await this.d.users.setStatus(id, input.status, tx);
       if (input.status === "suspended") await this.d.sessions.revokeAll(id, null, tx);
+      if (user.status !== input.status) {
+        await this.d.notifications.enqueue(
+          "account_status",
+          user.email,
+          {
+            name: user.name,
+            status: input.status,
+            message: input.reason,
+            loginUrl: `${env.APP_URL}/auth/login`,
+            supportEmail: env.SUPPORT_EMAIL,
+          },
+          { tx },
+        );
+      }
       await this.d.audit.record(
         {
           ...actorOf(principal),

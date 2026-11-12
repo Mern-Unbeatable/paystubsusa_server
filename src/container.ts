@@ -7,19 +7,74 @@ import { DbRateLimiter } from "./shared/rate-limit/db-rate-limiter.ts";
 import { StripeGateway, type PaymentGateway } from "./integrations/stripe.ts";
 import { FileMailer, SmtpMailer, type Mailer } from "./integrations/mailer.ts";
 import { LocalStorage, type ObjectStorage } from "./integrations/storage.ts";
-import { PlaywrightRenderer, type DocumentRenderer } from "./integrations/renderer.ts";
-import { AuditService, PrismaAuditLogRepository } from "./modules/audit/index.ts";
-import { NotificationsService, PrismaEmailDeliveryRepository } from "./modules/notifications/index.ts";
-import { PrismaVerificationChallengeRepository, VerificationController, VerificationService } from "./modules/verification/index.ts";
-import { AuthController, AuthService, PrismaRefreshSessionRepository, PrismaUserRepository, SessionService } from "./modules/auth/index.ts";
-import { AccountsController, AccountsService } from "./modules/accounts/index.ts";
-import { CatalogController, CatalogService, PrismaProductRepository, PrismaTemplateRepository } from "./modules/catalog/index.ts";
-import { DocumentsController, DocumentsService, PrismaDocumentRepository } from "./modules/documents/index.ts";
-import { PaymentsController, PaymentsService, PrismaPaymentRepository, PrismaWebhookEventRepository, WebhookService } from "./modules/payments/index.ts";
-import { PrismaSubscriptionRepository, SubscriptionsController, SubscriptionsService } from "./modules/subscriptions/index.ts";
-import { EntitlementsService, OrdersController, OrdersService, PrismaEntitlementRepository, PrismaOrderRepository } from "./modules/orders/index.ts";
-import { PrismaContactMessageRepository, SupportController, SupportService } from "./modules/support/index.ts";
-import { CustomerDashboardController, CustomerDashboardService, PrismaCustomerDashboardRepository } from "./modules/dash/customer/index.ts";
+import {
+  PlaywrightRenderer,
+  type DocumentRenderer,
+} from "./integrations/renderer.ts";
+import {
+  AuditService,
+  PrismaAuditLogRepository,
+} from "./modules/audit/index.ts";
+import {
+  NotificationsService,
+  PrismaEmailDeliveryRepository,
+} from "./modules/notifications/index.ts";
+import {
+  PrismaVerificationChallengeRepository,
+  VerificationController,
+  VerificationService,
+} from "./modules/verification/index.ts";
+import {
+  AuthController,
+  AuthService,
+  PrismaRefreshSessionRepository,
+  PrismaUserRepository,
+  SessionService,
+} from "./modules/auth/index.ts";
+import {
+  AccountsController,
+  AccountsService,
+} from "./modules/accounts/index.ts";
+import {
+  CatalogController,
+  CatalogService,
+  PrismaProductRepository,
+  PrismaTemplateRepository,
+} from "./modules/catalog/index.ts";
+import {
+  DocumentsController,
+  DocumentsService,
+  PrismaDocumentRepository,
+} from "./modules/documents/index.ts";
+import {
+  PaymentsController,
+  PaymentsService,
+  PrismaPaymentRepository,
+  PrismaWebhookEventRepository,
+  WebhookService,
+} from "./modules/payments/index.ts";
+import {
+  PrismaSubscriptionRepository,
+  SubscriptionsController,
+  SubscriptionsService,
+} from "./modules/subscriptions/index.ts";
+import {
+  EntitlementsService,
+  OrdersController,
+  OrdersService,
+  PrismaEntitlementRepository,
+  PrismaOrderRepository,
+} from "./modules/orders/index.ts";
+import {
+  PrismaContactMessageRepository,
+  SupportController,
+  SupportService,
+} from "./modules/support/index.ts";
+import {
+  CustomerDashboardController,
+  CustomerDashboardService,
+  PrismaCustomerDashboardRepository,
+} from "./modules/dash/customer/index.ts";
 import {
   AdminController,
   AdminCustomersService,
@@ -40,7 +95,9 @@ export interface Integrations {
 export function createContainer(overrides: Partial<Integrations> = {}) {
   const integrations: Integrations = {
     gateway: overrides.gateway ?? new StripeGateway(),
-    mailer: overrides.mailer ?? (env.MAIL_DRIVER === "smtp" ? new SmtpMailer() : new FileMailer()),
+    mailer:
+      overrides.mailer ??
+      (env.MAIL_DRIVER === "smtp" ? new SmtpMailer() : new FileMailer()),
     storage: overrides.storage ?? new LocalStorage(),
     renderer: overrides.renderer ?? new PlaywrightRenderer(),
   };
@@ -57,13 +114,46 @@ export function createContainer(overrides: Partial<Integrations> = {}) {
   const paymentRepo = new PrismaPaymentRepository();
 
   const audit = new AuditService(new PrismaAuditLogRepository());
-  const notifications = new NotificationsService({ deliveries: new PrismaEmailDeliveryRepository(), jobs, mailer });
-  const verification = new VerificationService({ challenges, notifications, tx });
-  const catalog = new CatalogService(new PrismaProductRepository(), new PrismaTemplateRepository());
-  const documents = new DocumentsService({ documents: new PrismaDocumentRepository(), jobs, storage, renderer, audit });
+  const notifications = new NotificationsService({
+    deliveries: new PrismaEmailDeliveryRepository(),
+    jobs,
+    mailer,
+    storage,
+  });
+  const verification = new VerificationService({
+    challenges,
+    notifications,
+    tx,
+  });
+  const catalog = new CatalogService(
+    new PrismaProductRepository(),
+    new PrismaTemplateRepository(),
+    storage,
+  );
+  const documents = new DocumentsService({
+    documents: new PrismaDocumentRepository(),
+    jobs,
+    storage,
+    renderer,
+    audit,
+    notifications,
+  });
   const payments = new PaymentsService(paymentRepo, gateway);
-  const subscriptions = new SubscriptionsService({ subscriptions: new PrismaSubscriptionRepository(), users, catalog, gateway, audit });
-  const entitlements = new EntitlementsService({ entitlements: new PrismaEntitlementRepository(), catalog, documents, tx });
+  const subscriptions = new SubscriptionsService({
+    subscriptions: new PrismaSubscriptionRepository(),
+    users,
+    catalog,
+    gateway,
+    audit,
+    payments: paymentRepo,
+    tx,
+  });
+  const entitlements = new EntitlementsService({
+    entitlements: new PrismaEntitlementRepository(),
+    catalog,
+    documents,
+    tx,
+  });
   const orders = new OrdersService({
     orders: new PrismaOrderRepository(),
     users,
@@ -76,13 +166,46 @@ export function createContainer(overrides: Partial<Integrations> = {}) {
     audit,
     tx,
   });
-  const sessions = new SessionService({ sessions: refreshSessions, users, audit, tx });
-  const auth = new AuthService({ users, sessions, verification, audit, orders, tx });
+  const sessions = new SessionService({
+    sessions: refreshSessions,
+    users,
+    audit,
+    tx,
+  });
+  const auth = new AuthService({
+    users,
+    sessions,
+    verification,
+    audit,
+    orders,
+    tx,
+  });
   const accounts = new AccountsService({ users, sessions, audit, tx, storage });
-  const webhooks = new WebhookService({ gateway, tx, events: webhookEvents, payments: paymentRepo, orders, subscriptions });
-  const support = new SupportService(new PrismaContactMessageRepository(), notifications, audit, tx);
-  const customerDashboard = new CustomerDashboardService(new PrismaCustomerDashboardRepository(), documents, payments, subscriptions);
-  const adminDashboard = new AdminDashboardService(new PrismaAdminDashboardRepository(), orders, audit);
+  const webhooks = new WebhookService({
+    gateway,
+    tx,
+    events: webhookEvents,
+    payments: paymentRepo,
+    orders,
+    subscriptions,
+  });
+  const support = new SupportService(
+    new PrismaContactMessageRepository(),
+    notifications,
+    audit,
+    tx,
+  );
+  const customerDashboard = new CustomerDashboardService(
+    new PrismaCustomerDashboardRepository(),
+    documents,
+    payments,
+    subscriptions,
+  );
+  const adminDashboard = new AdminDashboardService(
+    new PrismaAdminDashboardRepository(),
+    orders,
+    audit,
+  );
   const adminCustomers = new AdminCustomersService({
     customers: new PrismaAdminCustomerRepository(),
     users,
@@ -91,26 +214,69 @@ export function createContainer(overrides: Partial<Integrations> = {}) {
     documents,
     subscriptions,
     audit,
+    notifications,
     tx,
   });
-  const adminOps = new AdminOperationsService({ orders, payments, documents, catalog, users, gateway, audit, tx });
+  const adminOps = new AdminOperationsService({
+    orders,
+    payments,
+    documents,
+    catalog,
+    users,
+    gateway,
+    audit,
+    tx,
+  });
 
   return {
     integrations,
-    repositories: { users, jobs, idempotency, limiter, refreshSessions, challenges, webhookEvents },
-    services: { audit, notifications, verification, catalog, documents, payments, subscriptions, entitlements, orders, sessions, auth, accounts, webhooks, support },
+    repositories: {
+      users,
+      jobs,
+      idempotency,
+      limiter,
+      refreshSessions,
+      challenges,
+      webhookEvents,
+    },
+    services: {
+      audit,
+      notifications,
+      verification,
+      catalog,
+      documents,
+      payments,
+      subscriptions,
+      entitlements,
+      orders,
+      sessions,
+      auth,
+      accounts,
+      webhooks,
+      support,
+    },
     controllers: {
       auth: new AuthController(auth),
       accounts: new AccountsController(accounts),
       verification: new VerificationController(verification),
       catalog: new CatalogController(catalog),
       documents: new DocumentsController(documents),
-      orders: new OrdersController(orders, entitlements),
-      payments: new PaymentsController(payments, webhooks),
+      orders: new OrdersController(orders, entitlements, webhooks),
+      payments: new PaymentsController(payments, webhooks, (userId) => subscriptions.reconcile(userId)),
       subscriptions: new SubscriptionsController(subscriptions),
       support: new SupportController(support),
       customerDashboard: new CustomerDashboardController(customerDashboard),
-      admin: new AdminController({ dashboard: adminDashboard, customers: adminCustomers, ops: adminOps, orders, documents, payments, subscriptions, support, audit }),
+      admin: new AdminController({
+        dashboard: adminDashboard,
+        customers: adminCustomers,
+        ops: adminOps,
+        orders,
+        documents,
+        payments,
+        subscriptions,
+        support,
+        audit,
+      }),
     },
     checkDatabase: async () => {
       await prisma.$queryRaw`SELECT 1`;

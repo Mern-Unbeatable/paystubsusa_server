@@ -5170,10 +5170,10 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.test(\"checkout URL, or a documented refusal\", function () {",
+                      "pm.test(\"checkout client secret, or a documented refusal\", function () {",
                       "pm.expect(pm.response.code).to.be.oneOf([201, 409, 503]);",
                       "const b = pm.response.json();",
-                      "if (pm.response.code === 201) pm.expect(b.data.url).to.match(/^https:\\/\\//);",
+                      "if (pm.response.code === 201) pm.expect(b.data.clientSecret).to.be.a(\"string\").and.not.empty;",
                       "if (pm.response.code === 409) pm.expect(b.code).to.eql(\"SUBSCRIPTION_ACTIVE\");",
                       "if (pm.response.code === 503) pm.expect(b.code).to.eql(\"SUBSCRIPTION_UNAVAILABLE\");",
                       "});"
@@ -5207,7 +5207,7 @@
                     }
                   ]
                 },
-                "description": "201 `{data:{url}}` (Stripe Checkout). 409 `SUBSCRIPTION_ACTIVE` if already subscribed; 503 `SUBSCRIPTION_UNAVAILABLE` when the plan has no Stripe price.\n\n**Access:** Customer (Bearer)"
+                "description": "201 `{data:{clientSecret}}` (Stripe Checkout Session for the Payment Element in the app). 409 `SUBSCRIPTION_ACTIVE` if already subscribed; 503 `SUBSCRIPTION_UNAVAILABLE` when the plan has no Stripe price.\n\n**Access:** Customer (Bearer)"
               },
               "response": []
             }
@@ -7069,6 +7069,61 @@
           "response": []
         },
         {
+          "name": "Customer → Admin Guest Buyers",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let skipReason = \"\";",
+                  "const missing = [\"customerToken\"].filter(function (v) { return !pm.variables.get(v); });",
+                  "if (missing.length) skipReason = \"set \" + missing.join(\", \") + \" first\";",
+                  "if (skipReason) { console.warn(\"Skipped \\\"\" + pm.info.requestName + \"\\\": \" + skipReason); pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"error code is FORBIDDEN\", function () { pm.expect(pm.response.json().code).to.eql(\"FORBIDDEN\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/{{apiVersion}}/admin/guest-buyers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "{{apiVersion}}",
+                "admin",
+                "guest-buyers"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "**Access:** Customer (Bearer)"
+          },
+          "response": []
+        },
+        {
           "name": "Customer → Admin Product Update",
           "event": [
             {
@@ -7883,6 +7938,102 @@
                   "response": []
                 },
                 {
+                  "name": "List Guest Buyers",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+                          "",
+                          "pm.test(\"list envelope with pagination meta\", function () {",
+                          "const b = pm.response.json();",
+                          "pm.expect(b.data).to.be.an(\"array\");",
+                          "pm.expect(b.meta).to.include.all.keys(\"page\", \"pageSize\", \"totalItems\", \"totalPages\");",
+                          "pm.expect(b.meta.page).to.eql(Number(pm.request.url.query.get(\"page\") || 1));",
+                          "pm.expect(b.data.length).to.be.at.most(b.meta.pageSize);",
+                          "pm.expect(b.meta.totalPages).to.eql(Math.ceil(b.meta.totalItems / b.meta.pageSize));",
+                          "});",
+                          "const rows = pm.response.json().data;",
+                          "pm.test(\"row shape\", function () { rows.forEach(function (g) { pm.expect(g).to.include.all.keys(\"email\", \"orderCount\", \"paidOrderCount\", \"totalSpentCents\", \"firstOrderAt\", \"lastOrderAt\", \"hasAccount\"); }); });",
+                          "pm.test(\"sorted by spend\", function () { for (let i = 1; i < rows.length; i++) pm.expect(rows[i - 1].totalSpentCents).to.be.at.least(rows[i].totalSpentCents); });"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/{{apiVersion}}/admin/guest-buyers?sort=-totalSpent&page=1&pageSize=20",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "{{apiVersion}}",
+                        "admin",
+                        "guest-buyers"
+                      ],
+                      "query": [
+                        {
+                          "key": "sort",
+                          "value": "-totalSpent"
+                        },
+                        {
+                          "key": "page",
+                          "value": "1"
+                        },
+                        {
+                          "key": "pageSize",
+                          "value": "20"
+                        }
+                      ]
+                    },
+                    "description": "Orders placed without an account, grouped by email. `hasAccount` is true when that email registered later; those earlier orders stay unlinked."
+                  },
+                  "response": []
+                },
+                {
+                  "name": "List Guest Buyers - Invalid Sort",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"status is 400\", function () { pm.response.to.have.status(400); });"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/{{apiVersion}}/admin/guest-buyers?sort=name",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "{{apiVersion}}",
+                        "admin",
+                        "guest-buyers"
+                      ],
+                      "query": [
+                        {
+                          "key": "sort",
+                          "value": "name"
+                        }
+                      ]
+                    },
+                    "description": ""
+                  },
+                  "response": []
+                },
+                {
                   "name": "Get Customer",
                   "event": [
                     {
@@ -8299,6 +8450,156 @@
                         {
                           "key": "pageSize",
                           "value": "20"
+                        }
+                      ]
+                    },
+                    "description": ""
+                  },
+                  "response": []
+                },
+                {
+                  "name": "List Guest Orders",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+                          "",
+                          "pm.test(\"list envelope with pagination meta\", function () {",
+                          "const b = pm.response.json();",
+                          "pm.expect(b.data).to.be.an(\"array\");",
+                          "pm.expect(b.meta).to.include.all.keys(\"page\", \"pageSize\", \"totalItems\", \"totalPages\");",
+                          "pm.expect(b.meta.page).to.eql(Number(pm.request.url.query.get(\"page\") || 1));",
+                          "pm.expect(b.data.length).to.be.at.most(b.meta.pageSize);",
+                          "pm.expect(b.meta.totalPages).to.eql(Math.ceil(b.meta.totalItems / b.meta.pageSize));",
+                          "});",
+                          "pm.test(\"all guest orders\", function () { pm.response.json().data.forEach(function (o) { pm.expect(o.userId).to.eql(null); }); });"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/{{apiVersion}}/admin/orders?buyer=guest&page=1&pageSize=20",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "{{apiVersion}}",
+                        "admin",
+                        "orders"
+                      ],
+                      "query": [
+                        {
+                          "key": "buyer",
+                          "value": "guest"
+                        },
+                        {
+                          "key": "page",
+                          "value": "1"
+                        },
+                        {
+                          "key": "pageSize",
+                          "value": "20"
+                        }
+                      ]
+                    },
+                    "description": "Orders placed without an account (`userId` is null). `buyer=customer` returns account-linked orders."
+                  },
+                  "response": []
+                },
+                {
+                  "name": "List Customer Orders",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+                          "",
+                          "pm.test(\"list envelope with pagination meta\", function () {",
+                          "const b = pm.response.json();",
+                          "pm.expect(b.data).to.be.an(\"array\");",
+                          "pm.expect(b.meta).to.include.all.keys(\"page\", \"pageSize\", \"totalItems\", \"totalPages\");",
+                          "pm.expect(b.meta.page).to.eql(Number(pm.request.url.query.get(\"page\") || 1));",
+                          "pm.expect(b.data.length).to.be.at.most(b.meta.pageSize);",
+                          "pm.expect(b.meta.totalPages).to.eql(Math.ceil(b.meta.totalItems / b.meta.pageSize));",
+                          "});",
+                          "pm.test(\"all linked to an account\", function () { pm.response.json().data.forEach(function (o) { pm.expect(o.userId).to.be.a(\"string\"); }); });"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/{{apiVersion}}/admin/orders?buyer=customer&page=1&pageSize=20",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "{{apiVersion}}",
+                        "admin",
+                        "orders"
+                      ],
+                      "query": [
+                        {
+                          "key": "buyer",
+                          "value": "customer"
+                        },
+                        {
+                          "key": "page",
+                          "value": "1"
+                        },
+                        {
+                          "key": "pageSize",
+                          "value": "20"
+                        }
+                      ]
+                    },
+                    "description": ""
+                  },
+                  "response": []
+                },
+                {
+                  "name": "List Orders - Invalid Buyer",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"status is 400\", function () { pm.response.to.have.status(400); });"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/{{apiVersion}}/admin/orders?buyer=admin",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "{{apiVersion}}",
+                        "admin",
+                        "orders"
+                      ],
+                      "query": [
+                        {
+                          "key": "buyer",
+                          "value": "admin"
                         }
                       ]
                     },
@@ -9511,7 +9812,7 @@
             },
             {
               "name": "Contact Messages",
-              "description": "Support inbox (spec §9.10; no UI yet).",
+              "description": "Support inbox (spec §9.10), shown at /admin/contacts. Filters: `status` (new | handled) and `q` (name, email or subject). Create, status change and delete need a fresh admin role check. Message text can't be edited.",
               "item": [
                 {
                   "name": "List New Contact Messages",
@@ -9557,6 +9858,66 @@
                         {
                           "key": "status",
                           "value": "new"
+                        },
+                        {
+                          "key": "page",
+                          "value": "1"
+                        },
+                        {
+                          "key": "pageSize",
+                          "value": "20"
+                        }
+                      ]
+                    },
+                    "description": ""
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Search Contact Messages",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+                          "",
+                          "pm.test(\"list envelope with pagination meta\", function () {",
+                          "const b = pm.response.json();",
+                          "pm.expect(b.data).to.be.an(\"array\");",
+                          "pm.expect(b.meta).to.include.all.keys(\"page\", \"pageSize\", \"totalItems\", \"totalPages\");",
+                          "pm.expect(b.meta.page).to.eql(Number(pm.request.url.query.get(\"page\") || 1));",
+                          "pm.expect(b.data.length).to.be.at.most(b.meta.pageSize);",
+                          "pm.expect(b.meta.totalPages).to.eql(Math.ceil(b.meta.totalItems / b.meta.pageSize));",
+                          "});",
+                          "pm.test(\"matches name, email or subject\", function () {",
+                          "pm.response.json().data.forEach(function (m) {",
+                          "pm.expect((m.name + \" \" + m.email + \" \" + m.subject).toLowerCase()).to.include(\"postman\");",
+                          "});",
+                          "});"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/{{apiVersion}}/admin/contact-messages?q=Postman&page=1&pageSize=20",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "{{apiVersion}}",
+                        "admin",
+                        "contact-messages"
+                      ],
+                      "query": [
+                        {
+                          "key": "q",
+                          "value": "Postman"
                         },
                         {
                           "key": "page",
@@ -9627,6 +9988,333 @@
                           "language": "json"
                         }
                       }
+                    },
+                    "description": ""
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Create Contact Message (logged by admin)",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"status is 201\", function () { pm.response.to.have.status(201); });",
+                          "const m = pm.response.json().data;",
+                          "pm.test(\"created as new\", function () { pm.expect(m.status).to.eql(\"new\"); });",
+                          "pm.environment.set(\"adminContactMessageId\", m.id);"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/{{apiVersion}}/admin/contact-messages",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "{{apiVersion}}",
+                        "admin",
+                        "contact-messages"
+                      ]
+                    },
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": \"QA Phone Caller\",\n  \"email\": \"qa.phone@example.test\",\n  \"subject\": \"Postman admin-logged message\",\n  \"message\": \"Logged by an admin from the Postman collection.\",\n  \"status\": \"new\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "description": "Records a message received another way (phone, email). No notification email is sent."
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Update Contact Message - Text Fields Rejected",
+                  "event": [
+                    {
+                      "listen": "prerequest",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "let skipReason = \"\";",
+                          "const missing = [\"adminToken\",\"adminContactMessageId\"].filter(function (v) { return !pm.variables.get(v); });",
+                          "if (missing.length) skipReason = \"set \" + missing.join(\", \") + \" first\";",
+                          "if (skipReason) { console.warn(\"Skipped \\\"\" + pm.info.requestName + \"\\\": \" + skipReason); pm.execution.skipRequest(); }"
+                        ]
+                      }
+                    },
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"status is 400\", function () { pm.response.to.have.status(400); });"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "PATCH",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/{{apiVersion}}/admin/contact-messages/{{adminContactMessageId}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "{{apiVersion}}",
+                        "admin",
+                        "contact-messages",
+                        "{{adminContactMessageId}}"
+                      ]
+                    },
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"subject\": \"Edited subject\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "description": "Only `status` can change; message text is never edited."
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Reply to Contact Message",
+                  "event": [
+                    {
+                      "listen": "prerequest",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "let skipReason = \"\";",
+                          "const missing = [\"adminToken\",\"adminContactMessageId\"].filter(function (v) { return !pm.variables.get(v); });",
+                          "if (missing.length) skipReason = \"set \" + missing.join(\", \") + \" first\";",
+                          "if (skipReason) { console.warn(\"Skipped \\\"\" + pm.info.requestName + \"\\\": \" + skipReason); pm.execution.skipRequest(); }"
+                        ]
+                      }
+                    },
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });",
+                          "pm.test(\"marked handled\", function () { pm.expect(pm.response.json().data.status).to.eql(\"handled\"); });"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Idempotency-Key",
+                        "value": "{{$guid}}"
+                      },
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/{{apiVersion}}/admin/contact-messages/{{adminContactMessageId}}/reply",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "{{apiVersion}}",
+                        "admin",
+                        "contact-messages",
+                        "{{adminContactMessageId}}",
+                        "reply"
+                      ]
+                    },
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"message\": \"Thanks for reaching out. This is a reply from the Postman collection.\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "description": "Emails the reply to the sender (template `contact_reply`, Reply-To: support inbox) and marks the message handled. Requires an `Idempotency-Key` header; the audit log stores only the reply length."
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Reply to Contact Message - Empty Reply",
+                  "event": [
+                    {
+                      "listen": "prerequest",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "let skipReason = \"\";",
+                          "const missing = [\"adminToken\",\"adminContactMessageId\"].filter(function (v) { return !pm.variables.get(v); });",
+                          "if (missing.length) skipReason = \"set \" + missing.join(\", \") + \" first\";",
+                          "if (skipReason) { console.warn(\"Skipped \\\"\" + pm.info.requestName + \"\\\": \" + skipReason); pm.execution.skipRequest(); }"
+                        ]
+                      }
+                    },
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"status is 400\", function () { pm.response.to.have.status(400); });"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Idempotency-Key",
+                        "value": "{{$guid}}"
+                      },
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/{{apiVersion}}/admin/contact-messages/{{adminContactMessageId}}/reply",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "{{apiVersion}}",
+                        "admin",
+                        "contact-messages",
+                        "{{adminContactMessageId}}",
+                        "reply"
+                      ]
+                    },
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"message\": \"   \"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "description": ""
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Delete Contact Message",
+                  "event": [
+                    {
+                      "listen": "prerequest",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "let skipReason = \"\";",
+                          "const missing = [\"adminToken\",\"adminContactMessageId\"].filter(function (v) { return !pm.variables.get(v); });",
+                          "if (missing.length) skipReason = \"set \" + missing.join(\", \") + \" first\";",
+                          "if (skipReason) { console.warn(\"Skipped \\\"\" + pm.info.requestName + \"\\\": \" + skipReason); pm.execution.skipRequest(); }"
+                        ]
+                      }
+                    },
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"status is 204\", function () { pm.response.to.have.status(204); });"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "DELETE",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/{{apiVersion}}/admin/contact-messages/{{adminContactMessageId}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "{{apiVersion}}",
+                        "admin",
+                        "contact-messages",
+                        "{{adminContactMessageId}}"
+                      ]
+                    },
+                    "description": ""
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Delete Contact Message - Already Deleted",
+                  "event": [
+                    {
+                      "listen": "prerequest",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "let skipReason = \"\";",
+                          "const missing = [\"adminToken\",\"adminContactMessageId\"].filter(function (v) { return !pm.variables.get(v); });",
+                          "if (missing.length) skipReason = \"set \" + missing.join(\", \") + \" first\";",
+                          "if (skipReason) { console.warn(\"Skipped \\\"\" + pm.info.requestName + \"\\\": \" + skipReason); pm.execution.skipRequest(); }"
+                        ]
+                      }
+                    },
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"status is 404\", function () { pm.response.to.have.status(404); });"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "DELETE",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/{{apiVersion}}/admin/contact-messages/{{adminContactMessageId}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "{{apiVersion}}",
+                        "admin",
+                        "contact-messages",
+                        "{{adminContactMessageId}}"
+                      ]
                     },
                     "description": ""
                   },

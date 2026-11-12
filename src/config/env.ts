@@ -54,6 +54,9 @@ const schema = z
     CHROMIUM_EXECUTABLE_PATH: z.string().optional(),
     RENDER_CONCURRENCY: z.coerce.number().int().min(1).max(8).default(2),
 
+    /** Local development only; refused in production. */
+    RATE_LIMIT_ENABLED: bool.default(true),
+
     JOBS_ENABLED: bool.default(true),
     SCHEDULER_ENABLED: bool.default(true),
   })
@@ -71,6 +74,7 @@ const schema = z
       if (env.MAIL_DRIVER !== "smtp") ctx.addIssue({ code: "custom", path: ["MAIL_DRIVER"], message: "must be smtp in production" });
       if (!env.PUBLIC_API_URL) ctx.addIssue({ code: "custom", path: ["PUBLIC_API_URL"], message: "required in production" });
       if (env.COOKIE_SECURE === false) ctx.addIssue({ code: "custom", path: ["COOKIE_SECURE"], message: "cannot be false in production" });
+      if (!env.RATE_LIMIT_ENABLED) ctx.addIssue({ code: "custom", path: ["RATE_LIMIT_ENABLED"], message: "cannot be false in production" });
     }
   });
 

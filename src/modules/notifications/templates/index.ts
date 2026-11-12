@@ -5,26 +5,24 @@ const esc = (s: string) =>
 
 const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
-const layout = (title: string, bodyHtml: string) =>
-  `<!doctype html><html><body style="font-family:Arial,sans-serif;color:#111;max-width:560px;margin:auto">` +
-  `<h2>${esc(title)}</h2>${bodyHtml}<p style="color:#666;font-size:12px">Paystubs USA</p></body></html>`;
-
 /** 2076×758 with wide transparent side margins; keep the <img> at that ratio. */
 const LOGO_URL = "https://raw.githubusercontent.com/Mern-Unbeatable/paystubsusa_frontend/refs/heads/main/src/assets/logo.png";
 
 /** Centered card; tables and inline styles only, since email clients ignore stylesheets and flexbox. */
-const cardLayout = (title: string, bodyHtml: string) =>
+const cardLayout = (title: string, bodyHtml: string, iconHtml = "") =>
   `<!doctype html><html><body style="margin:0;padding:0;background:#f4f4f7">` +
   `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 12px"><tr><td align="center">` +
   `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;font-family:Arial,Helvetica,sans-serif;text-align:center">` +
   `<tr><td style="padding:40px 40px 0"><img src="${LOGO_URL}" width="200" height="73" alt="Paystubs USA" style="display:inline-block;width:200px;max-width:100%;height:auto;border:0"></td></tr>` +
-  `<tr><td style="padding:40px 40px 0"><h1 style="margin:0 0 16px;font-size:22px;color:#111827">${esc(title)}</h1>${bodyHtml}</td></tr>` +
+  `<tr><td style="padding:40px 40px 0">${iconHtml}<h1 style="margin:0 0 16px;font-size:22px;color:#111827">${esc(title)}</h1>${bodyHtml}</td></tr>` +
   `<tr><td style="padding:40px 40px 32px"><hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 24px">` +
   `<p style="margin:0 0 12px;font-size:14px;color:#6b7280">Paystubs USA, professional paystubs and tax forms in minutes.</p>` +
   `<p style="margin:0;font-size:12px;color:#9ca3af">&copy; ${new Date().getFullYear()} Paystubs USA. All rights reserved.</p></td></tr>` +
   `</table></td></tr></table></body></html>`;
 
-type Rendered = Omit<OutgoingEmail, "to">;
+/** Attachments are referenced by storage key; the sender loads the bytes, so payloads stay small. */
+export type StoredAttachment = { storageKey: string; fileName: string };
+type Rendered = Omit<OutgoingEmail, "to" | "attachments"> & { attachments?: StoredAttachment[] };
 
 export const emailTemplates = {
   verification_code: (p: { code: string; purpose: "checkout" | "document_access" }): Rendered => {
@@ -32,7 +30,12 @@ export const emailTemplates = {
     return {
       subject: `Your verification code: ${p.code}`,
       text: `Use this code to ${why}: ${p.code}\n\nIt expires in 10 minutes. If you didn't request it, ignore this email.`,
-      html: layout("Your verification code", `<p>Use this code to ${why}:</p><p style="font-size:28px;letter-spacing:6px"><b>${esc(p.code)}</b></p><p>It expires in 10 minutes. If you didn't request it, ignore this email.</p>`),
+      html: cardLayout(
+        "Your verification code",
+        `<p style="margin:0 0 24px;font-size:15px;line-height:22px;color:#1f2937">Enter this code in the browser window where you started, to ${why} with Paystubs USA.</p>` +
+          `<div style="background:#eff1f0;border-radius:12px;padding:28px 16px;font-size:34px;font-weight:700;letter-spacing:6px;color:#111827">${esc(p.code)}</div>` +
+          `<p style="margin:24px 0 0;font-size:14px;line-height:21px;color:#6b7280">If you didn't request this code, please disregard this email. The code will remain active for 10 minutes.</p>`,
+      ),
       tag: "verification-code",
     };
   },
@@ -68,27 +71,215 @@ export const emailTemplates = {
     tag: "password-reset",
   }),
 
-  order_receipt: (p: { orderNumber: string; totalCents: number; documentsUrl: string; lines: { name: string; quantity: number; amountCents: number }[] }): Rendered => ({
-    subject: `Your Paystubs USA order ${p.orderNumber}`,
+  order_receipt: (p: {
+    orderNumber: string;
+    totalCents: number;
+    paidAt?: string;
+    billedTo?: string;
+    cardBrand?: string | null;
+    cardLast4?: string | null;
+    receiptUrl?: string | null;
+    generatorUrl?: string;
+    documentsUrl: string;
+    lines: { name: string; quantity: number; amountCents: number }[];
+  }): Rendered => {
+    const paidOn = new Date(p.paidAt ?? Date.now()).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+    const cell = "padding:10px 20px;border-top:1px solid #e5e7eb";
+    const label = "font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px";
+    const value = "margin-top:4px;font-size:14px;font-weight:700;color:#111827;word-break:break-all";
+    const method = p.cardLast4 ? `${p.cardBrand ? p.cardBrand[0]!.toUpperCase() + p.cardBrand.slice(1) : "Card"} &bull;&bull;&bull;&bull; ${esc(p.cardLast4)}` : "Card";
+    const receiptUrl = p.receiptUrl?.startsWith("https://") ? p.receiptUrl : null;
+    const second = receiptUrl
+      ? { href: receiptUrl, text: "View Invoice" }
+      : p.generatorUrl
+        ? { href: p.generatorUrl, text: "Create Another Paystub" }
+        : null;
+    const meta = [
+      ["Invoice no.", esc(p.orderNumber)],
+      ["Date paid", paidOn],
+      ...(p.billedTo ? [["Billed to", esc(p.billedTo)]] : []),
+      ["Payment method", method],
+    ];
+    const metaRows = [];
+    for (let i = 0; i < meta.length; i += 2) {
+      metaRows.push(
+        `<tr>` +
+          meta
+            .slice(i, i + 2)
+            .map(([k, v]) => `<td width="50%" valign="top" style="padding:0 20px 14px"><div style="${label}">${k}</div><div style="${value}">${v}</div></td>`)
+            .join("") +
+          `</tr>`,
+      );
+    }
+    const steps = [
+      "Click <b>View My Documents</b> below.",
+      "Sign in, or confirm this email address with a one-time code.",
+      "Download your documents as print-ready PDFs.",
+    ];
+    return {
+      subject: `Your Paystubs USA order ${p.orderNumber}`,
+      text:
+        `Payment successful. Thanks for your purchase.\n\nInvoice: ${p.orderNumber}\nDate paid: ${paidOn}\n` +
+        (p.billedTo ? `Billed to: ${p.billedTo}\n` : "") +
+        `\n` +
+        p.lines.map((l) => `${l.quantity} × ${l.name}: ${money(l.amountCents)}`).join("\n") +
+        `\nTotal paid: ${money(p.totalCents)}\n\nView your documents: ${p.documentsUrl}\n(You'll be asked to sign in or confirm your email.)` +
+        (second ? `\n${second.text}: ${second.href}` : ""),
+      html: cardLayout(
+        "Payment successful",
+        `<p style="margin:0 0 28px;font-size:15px;line-height:22px;color:#1f2937">Thanks for your purchase! Here is your invoice. We're preparing your documents, and they'll be ready to download in a moment.</p>` +
+          `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:12px;text-align:left;font-size:14px;color:#1f2937;border-collapse:separate">` +
+          `<tr><td style="padding:18px 20px;border-bottom:1px solid #e5e7eb;border-radius:12px 0 0 0;background:#f9fafb;font-size:18px;font-weight:700;color:#092258;letter-spacing:1px">INVOICE</td>` +
+          `<td align="right" style="padding:18px 20px;border-bottom:1px solid #e5e7eb;border-radius:0 12px 0 0;background:#f9fafb"><span style="display:inline-block;padding:4px 12px;background:#dcfce7;border-radius:999px;font-size:12px;font-weight:700;color:#15803d">PAID</span></td></tr>` +
+          `<tr><td colspan="2" style="padding:18px 0 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${metaRows.join("")}</table></td></tr>` +
+          `<tr><td style="padding:10px 20px;border-top:1px solid #e5e7eb;${label}">Description</td><td align="right" style="padding:10px 20px;border-top:1px solid #e5e7eb;${label}">Amount</td></tr>` +
+          p.lines
+            .map(
+              (l) =>
+                `<tr><td style="${cell}">${esc(l.name)}${l.quantity > 1 ? ` <span style="color:#6b7280">&times; ${l.quantity}</span>` : ""}</td>` +
+                `<td align="right" style="${cell}">${money(l.amountCents)}</td></tr>`,
+            )
+            .join("") +
+          `<tr><td style="padding:16px 20px;background:#f9fafb;border-top:1px solid #e5e7eb;border-radius:0 0 0 12px;font-weight:700;font-size:16px">Total paid</td>` +
+          `<td align="right" style="padding:16px 20px;background:#f9fafb;border-top:1px solid #e5e7eb;border-radius:0 0 12px 0;font-weight:700;font-size:18px;color:#092258">${money(p.totalCents)}</td></tr></table>` +
+          `<div style="margin:22px 0 0;text-align:center">` +
+          `<a href="${esc(p.documentsUrl)}" target="_blank" style="display:inline-block;margin:6px;padding:12px 24px;background:#092258;border:2px solid #092258;border-radius:10px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none">View My Documents</a>` +
+          (second
+            ? `<a href="${esc(second.href)}" target="_blank" style="display:inline-block;margin:6px;padding:12px 24px;background:#ffffff;border:2px solid #092258;border-radius:10px;font-size:15px;font-weight:700;color:#092258;text-decoration:none">${second.text}</a>`
+            : "") +
+          `</div>` +
+          `<div style="margin:28px 0 0;padding:18px 20px;background:#eff6ff;border-radius:12px;text-align:left">` +
+          `<div style="margin:0 0 10px;font-size:14px;font-weight:700;color:#092258">How to get your documents</div>` +
+          steps
+            .map(
+              (s, i) =>
+                `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 8px"><tr>` +
+                `<td valign="top" style="width:22px"><div style="width:22px;height:22px;background:#092258;border-radius:11px;color:#ffffff;font-size:12px;font-weight:700;text-align:center;line-height:22px">${i + 1}</div></td>` +
+                `<td style="padding:0 0 0 10px;font-size:14px;line-height:22px;color:#1f2937">${s}</td></tr></table>`,
+            )
+            .join("") +
+          `</div>` +
+          `<p style="margin:20px 0 0;font-size:13px;line-height:20px;color:#6b7280">Keep this email for your records. You can come back to your documents any time using the link above.</p>`,
+        `<table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto 16px"><tr>` +
+          `<td style="width:56px;height:56px;background:#dcfce7;border-radius:28px;text-align:center;line-height:56px;font-size:28px;font-weight:700;color:#16a34a">&#10003;</td></tr></table>`,
+      ),
+      tag: "order-receipt",
+    };
+  },
+
+  documents_ready: (p: { orderNumber: string; title: string; documentsUrl: string; file: StoredAttachment }): Rendered => ({
+    subject: `Your document is ready: ${p.title}`,
     text:
-      `Thanks for your purchase.\n\nOrder ${p.orderNumber}\n` +
-      p.lines.map((l) => `${l.quantity} × ${l.name}: ${money(l.amountCents)}`).join("\n") +
-      `\nTotal: ${money(p.totalCents)}\n\nDownload your documents: ${p.documentsUrl}\n(You'll be asked to sign in or confirm your email.)`,
-    html: layout(
-      "Thanks for your purchase",
-      `<p>Order <b>${esc(p.orderNumber)}</b></p><ul>` +
-        p.lines.map((l) => `<li>${l.quantity} × ${esc(l.name)}: ${money(l.amountCents)}</li>`).join("") +
-        `</ul><p>Total: <b>${money(p.totalCents)}</b></p><p><a href="${esc(p.documentsUrl)}">Download your documents</a> (you'll be asked to sign in or confirm your email).</p>`,
+      `Your document for order ${p.orderNumber} is ready, and the PDF is attached to this email.\n\n` +
+      `You can also download it any time: ${p.documentsUrl}\n(You'll be asked to sign in or confirm your email.)`,
+    html: cardLayout(
+      "Your document is ready",
+      `<p style="margin:0 0 24px;font-size:15px;line-height:22px;color:#1f2937">Good news! Your document for order <b>${esc(p.orderNumber)}</b> has been generated. The PDF is attached to this email.</p>` +
+        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eff1f0;border-radius:12px;text-align:left"><tr>` +
+        `<td width="44" style="padding:16px 0 16px 20px"><div style="width:40px;height:40px;background:#fee2e2;border-radius:8px;text-align:center;line-height:40px;font-size:11px;font-weight:700;color:#b91c1c">PDF</div></td>` +
+        `<td style="padding:16px 20px 16px 12px"><div style="font-size:15px;font-weight:700;color:#111827">${esc(p.title)}</div>` +
+        `<div style="margin-top:2px;font-size:13px;color:#6b7280;word-break:break-all">${esc(p.file.fileName)}</div></td></tr></table>` +
+        `<div style="margin:22px 0 0;text-align:center">` +
+        `<a href="${esc(p.documentsUrl)}" target="_blank" style="display:inline-block;margin:6px;padding:12px 24px;background:#092258;border:2px solid #092258;border-radius:10px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none">View My Documents</a></div>` +
+        `<p style="margin:24px 0 0;font-size:14px;line-height:21px;color:#6b7280">This document contains personal information. Please keep this email private.</p>`,
     ),
-    tag: "order-receipt",
+    tag: "documents-ready",
+    attachments: [p.file],
   }),
 
-  contact_notification: (p: { name: string; email: string; subject: string; message: string }): Rendered => ({
-    subject: `[Contact] ${p.subject}`,
-    text: `From: ${p.name} <${p.email}>\n\n${p.message}`,
-    html: layout("New contact message", `<p>From: ${esc(p.name)} &lt;${esc(p.email)}&gt;</p><p><b>${esc(p.subject)}</b></p><pre style="white-space:pre-wrap">${esc(p.message)}</pre>`),
-    tag: "contact",
-  }),
+  contact_notification: (p: { name: string; email: string; subject: string; message: string }): Rendered => {
+    const label = "font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px";
+    const value = "margin-top:4px;font-size:14px;font-weight:700;color:#111827;word-break:break-word";
+    const mailto = `mailto:${p.email}?subject=${encodeURIComponent(`Re: ${p.subject}`)}`;
+    const firstName = p.name.trim().split(/\s+/)[0] || p.name;
+    return {
+      subject: `[Contact] ${p.subject}`,
+      text: `New contact message\n\nFrom: ${p.name} <${p.email}>\nSubject: ${p.subject}\n\n${p.message}\n\nReply to this email to answer ${p.name} directly.`,
+      html: cardLayout(
+        "New contact message",
+        `<p style="margin:0 0 28px;font-size:15px;line-height:22px;color:#1f2937"><b>${esc(p.name)}</b> sent a message through Paystubs USA support.</p>` +
+          `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:12px;text-align:left;font-size:14px;color:#1f2937;border-collapse:separate">` +
+          `<tr><td style="padding:18px 20px;border-bottom:1px solid #e5e7eb;border-radius:12px 0 0 0;background:#f9fafb;font-size:18px;font-weight:700;color:#092258;letter-spacing:1px">MESSAGE</td>` +
+          `<td align="right" style="padding:18px 20px;border-bottom:1px solid #e5e7eb;border-radius:0 12px 0 0;background:#f9fafb"><span style="display:inline-block;padding:4px 12px;background:#dbeafe;border-radius:999px;font-size:12px;font-weight:700;color:#1d4ed8">NEW</span></td></tr>` +
+          `<tr><td width="50%" valign="top" style="padding:18px 20px 14px"><div style="${label}">From</div><div style="${value}">${esc(p.name)}</div></td>` +
+          `<td width="50%" valign="top" style="padding:18px 20px 14px"><div style="${label}">Email</div><div style="${value}"><a href="mailto:${esc(p.email)}" style="color:#092258;text-decoration:none">${esc(p.email)}</a></div></td></tr>` +
+          `<tr><td colspan="2" style="padding:0 20px 18px"><div style="${label}">Subject</div><div style="${value}">${esc(p.subject)}</div></td></tr>` +
+          `<tr><td colspan="2" style="padding:18px 20px 20px;border-top:1px solid #e5e7eb"><div style="${label};margin-bottom:10px">Message</div>` +
+          `<div style="padding:16px 18px;background:#f9fafb;border-left:4px solid #092258;border-radius:8px;font-size:15px;line-height:23px;color:#1f2937;white-space:pre-wrap;word-break:break-word">${esc(p.message)}</div></td></tr></table>` +
+          `<div style="margin:22px 0 0;text-align:center">` +
+          `<a href="${esc(mailto)}" target="_blank" style="display:inline-block;margin:6px;padding:12px 24px;background:#092258;border:2px solid #092258;border-radius:10px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none">Reply to ${esc(firstName)}</a></div>` +
+          `<p style="margin:20px 0 0;font-size:13px;line-height:20px;color:#6b7280">You can also just reply to this email; it goes straight to ${esc(p.email)}.</p>`,
+        `<table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto 16px"><tr>` +
+          `<td style="width:56px;height:56px;background:#dbeafe;border-radius:28px;text-align:center;line-height:56px;font-size:26px;color:#1d4ed8">&#9993;</td></tr></table>`,
+      ),
+      replyTo: p.email,
+      tag: "contact",
+    };
+  },
+
+  /** Support's answer to a contact message; the customer's reply goes back to the support inbox. */
+  contact_reply: (p: { name: string; subject: string; reply: string; originalMessage: string; supportEmail: string }): Rendered => {
+    const firstName = p.name.trim().split(/\s+/)[0] || p.name;
+    return {
+      subject: `Re: ${p.subject}`,
+      text: `Hi ${firstName},\n\n${p.reply}\n\nPaystubs USA Support\n\n--- Your message ---\n${p.originalMessage}`,
+      html: cardLayout(
+        "Reply from Paystubs USA support",
+        `<p style="margin:0 0 20px;font-size:15px;line-height:22px;color:#1f2937;text-align:left">Hi ${esc(firstName)},</p>` +
+          `<div style="margin:0 0 24px;font-size:15px;line-height:23px;color:#1f2937;text-align:left;white-space:pre-wrap;word-break:break-word">${esc(p.reply)}</div>` +
+          `<p style="margin:0 0 28px;font-size:15px;line-height:22px;color:#1f2937;text-align:left">Paystubs USA Support</p>` +
+          `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:12px;text-align:left;border-collapse:separate">` +
+          `<tr><td style="padding:14px 20px;border-bottom:1px solid #e5e7eb;border-radius:12px 12px 0 0;background:#f9fafb;font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Your message: ${esc(p.subject)}</td></tr>` +
+          `<tr><td style="padding:16px 20px"><div style="padding:14px 16px;background:#f9fafb;border-left:4px solid #cbd5e1;border-radius:8px;font-size:14px;line-height:21px;color:#4b5563;white-space:pre-wrap;word-break:break-word">${esc(p.originalMessage)}</div></td></tr></table>` +
+          `<p style="margin:20px 0 0;font-size:13px;line-height:20px;color:#6b7280">Need more help? Just reply to this email.</p>`,
+        `<table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto 16px"><tr>` +
+          `<td style="width:56px;height:56px;background:#dbeafe;border-radius:28px;text-align:center;line-height:56px;font-size:26px;color:#1d4ed8">&#9993;</td></tr></table>`,
+      ),
+      replyTo: p.supportEmail,
+      tag: "contact-reply",
+    };
+  },
+
+  /** Sent when an admin suspends or reactivates an account; `message` is the admin's optional reason. */
+  account_status: (p: {
+    name: string;
+    status: "active" | "suspended";
+    message?: string;
+    loginUrl: string;
+    supportEmail: string;
+  }): Rendered => {
+    const firstName = p.name.trim().split(/\s+/)[0] || p.name;
+    const suspended = p.status === "suspended";
+    const title = suspended ? "Your account has been suspended" : "Your account has been reactivated";
+    const intro = suspended
+      ? "Your Paystubs USA account has been suspended, and you've been signed out on all devices. You won't be able to sign in until it's reactivated."
+      : "Your Paystubs USA account has been reactivated. You can sign in again.";
+    const help = suspended
+      ? "If you think this is a mistake, reply to this email and our support team will look into it."
+      : "Questions? Just reply to this email.";
+    return {
+      subject: title,
+      text: `Hi ${firstName},\n\n${intro}\n\n${p.message ? `Message from our team:\n${p.message}\n\n` : ""}${suspended ? "" : `Sign in: ${p.loginUrl}\n\n`}${help}\n\nPaystubs USA Support`,
+      html: cardLayout(
+        title,
+        `<p style="margin:0 0 20px;font-size:15px;line-height:22px;color:#1f2937;text-align:left">Hi ${esc(firstName)},</p>` +
+          `<p style="margin:0 0 24px;font-size:15px;line-height:22px;color:#1f2937;text-align:left">${esc(intro)}</p>` +
+          (p.message
+            ? `<div style="margin:0 0 24px;text-align:left"><div style="margin-bottom:8px;font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Message from our team</div>` +
+              `<div style="padding:14px 16px;background:#f9fafb;border-left:4px solid #092258;border-radius:8px;font-size:15px;line-height:23px;color:#1f2937;white-space:pre-wrap;word-break:break-word">${esc(p.message)}</div></div>`
+            : "") +
+          (suspended
+            ? ""
+            : `<div style="margin:0 0 24px;text-align:center">` +
+              `<a href="${esc(p.loginUrl)}" target="_blank" style="display:inline-block;margin:6px;padding:12px 24px;background:#092258;border:2px solid #092258;border-radius:10px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none">Sign In</a></div>`) +
+          `<p style="margin:0;font-size:14px;line-height:21px;color:#6b7280;text-align:left">${esc(help)}</p>`,
+        `<table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto 16px"><tr>` +
+          `<td style="width:56px;height:56px;background:${suspended ? "#fee2e2" : "#dcfce7"};border-radius:28px;text-align:center;line-height:56px;font-size:26px;color:${suspended ? "#b91c1c" : "#15803d"}">${suspended ? "&#9888;" : "&#10003;"}</td></tr></table>`,
+      ),
+      replyTo: p.supportEmail,
+      tag: "account-status",
+    };
+  },
 } as const;
 
 export type EmailTemplateName = keyof typeof emailTemplates;

@@ -10,6 +10,9 @@ export interface OutgoingEmail {
   html: string;
   /** Category label (e.g. "password-reset"); sent as the X-Email-Tag header. */
   tag?: string;
+  /** Where "Reply" in the recipient's mail app goes (e.g. the customer who wrote in). */
+  replyTo?: string;
+  attachments?: { filename: string; content: Buffer; contentType: string }[];
 }
 
 /** Mail port; the container picks the implementation, so another provider can be added behind it. */
@@ -55,7 +58,9 @@ export class SmtpMailer implements Mailer {
         subject: email.subject,
         text: email.text,
         html: email.html,
+        replyTo: email.replyTo,
         headers: email.tag ? { "X-Email-Tag": email.tag } : undefined,
+        attachments: email.attachments,
       });
       return { providerMessageId: info.messageId };
     } catch (err) {
@@ -79,7 +84,9 @@ export class FileMailer implements Mailer {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     await writeFile(
       path.join(env.LOCAL_MAIL_DIR, `${id}.txt`),
-      `To: ${email.to}\nSubject: ${email.subject}\n\n${email.text}\n`,
+      `To: ${email.to}\nSubject: ${email.subject}\n` +
+        (email.attachments?.length ? `Attachments: ${email.attachments.map((a) => a.filename).join(", ")}\n` : "") +
+        `\n${email.text}\n`,
       "utf8",
     );
     return { providerMessageId: `file:${id}` };

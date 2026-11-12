@@ -52,7 +52,16 @@ export interface PaymentRepository {
     tx?: Tx,
   ): Promise<PaymentRow>;
   upsertInvoice(
-    input: { subscriptionId: string; providerPaymentId: string; amountCents: number; currency: string; status: PaymentStatus },
+    input: {
+      subscriptionId: string;
+      providerPaymentId: string;
+      amountCents: number;
+      currency: string;
+      status: PaymentStatus;
+      receiptUrl?: string | null;
+      cardBrand?: string | null;
+      cardLast4?: string | null;
+    },
     tx?: Tx,
   ): Promise<PaymentRow>;
   findByProviderId(providerPaymentId: string, tx?: Tx): Promise<PaymentRow | null>;

@@ -1,4 +1,5 @@
 import type { Mailer } from "../../integrations/mailer.ts";
+import type { ObjectStorage } from "../../integrations/storage.ts";
 import type { Tx } from "../../shared/db/transaction.ts";
 import type { JobRepository } from "../../shared/jobs/job.repository.ts";
 import type { JobContext } from "../../shared/jobs/job-runner.ts";
@@ -9,6 +10,7 @@ interface Deps {
   deliveries: EmailDeliveryRepository;
   jobs: JobRepository;
   mailer: Mailer;
+  storage: ObjectStorage;
 }
 
 export class NotificationsService {
@@ -44,7 +46,14 @@ export class NotificationsService {
     }
 
     try {
-      const { providerMessageId } = await this.d.mailer.send({ to: delivery.toEmail, ...render(delivery.payload) });
+      const { attachments, ...email } = render(delivery.payload);
+      const files = [];
+      for (const a of attachments ?? []) {
+        const content = await this.d.storage.get(a.storageKey);
+        if (!content) throw new Error(`Attachment ${a.fileName} is missing from storage`);
+        files.push({ filename: a.fileName, content, contentType: "application/pdf" });
+      }
+      const { providerMessageId } = await this.d.mailer.send({ to: delivery.toEmail, ...email, attachments: files.length ? files : undefined });
       await this.d.deliveries.markSent(deliveryId, providerMessageId);
     } catch (err) {
       await this.d.deliveries.markAttemptFailed(deliveryId, err instanceof Error ? err.message : String(err), ctx.isFinalAttempt);

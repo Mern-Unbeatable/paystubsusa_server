@@ -197,8 +197,11 @@ model DocumentTemplate {
   renderer     String
   variant      Json?
   isActive     Boolean      @default(true) @map("is_active")
-  isDefault    Boolean      @default(false) @map("is_default")
-  sortOrder    Int          @default(0) @map("sort_order")
+  isDefault       Boolean      @default(false) @map("is_default")
+  sortOrder       Int          @default(0) @map("sort_order")
+  previewImageKey String?      @map("preview_image_key")
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   documents Document[]
 

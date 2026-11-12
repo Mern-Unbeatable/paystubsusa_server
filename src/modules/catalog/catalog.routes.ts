@@ -5,6 +5,7 @@ export function catalogRoutes(controller: CatalogController) {
   const router = Router();
   router.get("/catalog/products", controller.products);
   router.get("/catalog/templates", controller.templates);
+  router.get("/template-previews/:file", controller.templatePreview);
   router.post("/catalog/quote", controller.quote);
   return router;
 }

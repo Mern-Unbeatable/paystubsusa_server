@@ -58,6 +58,26 @@ export class WebhookService {
     return { duplicate: false };
   }
 
+  /**
+   * Fallback when the webhook is missed or late: asks Stripe directly whether an open PaymentIntent
+   * succeeded and, if so, runs the same verified fulfilment. Returns true when it fulfilled or found it paid.
+   */
+  async reconcileOrder(orderId: string): Promise<boolean> {
+    try {
+      for (const p of await this.d.payments.listForOrder(orderId)) {
+        if (p.status !== "requires_payment" && p.status !== "processing" && p.status !== "failed") continue;
+        const pi = await this.d.gateway.retrievePaymentIntent(p.providerPaymentId);
+        if (pi.status !== "succeeded" || pi.metadata?.["orderId"] !== orderId) continue;
+        const pre = { card: await this.d.gateway.getCardDetails(pi.id) };
+        await this.d.tx.run((tx) => this.paymentSucceeded(pi, pre, tx));
+        return true;
+      }
+    } catch (err) {
+      logger.warn({ err, orderId }, "Payment reconciliation failed");
+    }
+    return false;
+  }
+
   private async prefetch(event: StripeEvent): Promise<Prefetched> {
     switch (event.type) {
       case "payment_intent.succeeded":
@@ -74,7 +94,9 @@ export class WebhookService {
       case "invoice.paid":
       case "invoice.payment_failed": {
         const subId = idOf(event.data.object.parent?.subscription_details?.subscription);
-        return subId ? { subscription: await this.d.gateway.retrieveSubscription(subId) } : {};
+        if (!subId) return {};
+        const card = event.type === "invoice.paid" && event.data.object.id ? await this.d.gateway.getInvoiceCardDetails(event.data.object.id) : null;
+        return { subscription: await this.d.gateway.retrieveSubscription(subId), ...(card ? { card } : {}) };
       }
       default:
         return {};
@@ -122,7 +144,7 @@ export class WebhookService {
     if (received.amountCents !== order.totalCents || received.currency !== order.currency) {
       return this.d.orders.flagAmountMismatch(order, received, tx);
     }
-    await this.d.orders.fulfill(order, tx);
+    await this.d.orders.fulfill(order, tx, { sendReceipt: true, card: pre.card });
   }
 
   private async paymentFailed(pi: Stripe.PaymentIntent, tx: Tx) {
@@ -160,6 +182,8 @@ export class WebhookService {
         amountCents: paid ? invoice.amount_paid : invoice.amount_due,
         currency: invoice.currency,
         status: paid ? "succeeded" : "failed",
+        receiptUrl: invoice.hosted_invoice_url ?? null,
+        ...(pre.card ? { cardBrand: pre.card.cardBrand, cardLast4: pre.card.cardLast4 } : {}),
       },
       tx,
     );

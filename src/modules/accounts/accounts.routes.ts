@@ -1,25 +1,12 @@
 import { Router, type RequestHandler } from "express";
-import multer from "multer";
+import { singleImageUpload } from "../../shared/http/image-upload.ts";
 import { requirePrincipal } from "../../shared/middleware/require-role.ts";
 import { rateLimit } from "../../shared/rate-limit/db-rate-limiter.ts";
 import type { RateLimiter } from "../../shared/rate-limit/rate-limiter.ts";
 import type { AccountsController } from "./accounts.controller.ts";
 import { AVATAR_MAX_BYTES, invalidAvatar } from "./avatar.ts";
 
-const avatarUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: AVATAR_MAX_BYTES, files: 1, fields: 0, parts: 1 },
-}).single("avatar");
-
-const parseAvatar: RequestHandler = (req, res, next) => {
-  avatarUpload(req, res, (err: unknown) => {
-    if (!err) return next();
-    if (err instanceof multer.MulterError) {
-      return next(invalidAvatar(err.code === "LIMIT_FILE_SIZE" ? "Image must be 2 MB or smaller" : "Upload a single image in the avatar field"));
-    }
-    next(err);
-  });
-};
+const parseAvatar = singleImageUpload("avatar", AVATAR_MAX_BYTES, invalidAvatar);
 
 export function accountsRoutes(controller: AccountsController, limiter: RateLimiter) {
   const router = Router();
