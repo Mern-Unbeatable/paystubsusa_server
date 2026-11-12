@@ -15,8 +15,8 @@ export class PaymentsController {
   }
 
   list = async (req: Request, res: Response) => {
-    const page = parse(listPaymentsQuery, req.query);
-    res.json(await this.payments.list(ownerPrincipal(req), {}, page));
+    const { status, ...page } = parse(listPaymentsQuery, req.query);
+    res.json(await this.payments.list(ownerPrincipal(req), { status }, page));
   };
 
   get = async (req: Request, res: Response) => {
