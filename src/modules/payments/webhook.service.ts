@@ -142,7 +142,7 @@ export class WebhookService {
     if (received.amountCents !== order.totalCents || received.currency !== order.currency) {
       return this.d.orders.flagAmountMismatch(order, received, tx);
     }
-    await this.d.orders.fulfill(order, tx);
+    await this.d.orders.fulfill(order, tx, { sendReceipt: true, card: pre.card });
   }
 
   private async paymentFailed(pi: Stripe.PaymentIntent, tx: Tx) {

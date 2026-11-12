@@ -195,7 +195,11 @@ export class OrdersService implements GuestOrderLinker {
   }
 
   /** Paid: queue renders, grant credits, link a verified account, send the receipt. Runs in the webhook transaction. */
-  async fulfill(order: OrderRow, tx: Tx, options: { sendReceipt: boolean } = { sendReceipt: true }) {
+  async fulfill(
+    order: OrderRow,
+    tx: Tx,
+    options: { sendReceipt: boolean; card?: { cardBrand: string | null; cardLast4: string | null; receiptUrl: string | null } } = { sendReceipt: true },
+  ) {
     const paidAt = order.paidAt ?? new Date();
     await this.d.orders.updateStatus(order.id, "paid", tx, paidAt);
     await this.d.documents.queueForPaidOrder(order.id, tx);
@@ -218,6 +222,11 @@ export class OrdersService implements GuestOrderLinker {
           orderNumber: order.orderNumber,
           totalCents: order.totalCents,
           paidAt: paidAt.toISOString(),
+          billedTo: order.email,
+          cardBrand: options.card?.cardBrand ?? null,
+          cardLast4: options.card?.cardLast4 ?? null,
+          receiptUrl: options.card?.receiptUrl ?? null,
+          generatorUrl: `${env.APP_URL}/paystub-generator`,
           documentsUrl: `${env.APP_URL}/find-paystubs`,
           lines: order.items.map((i) => ({ name: i.name, quantity: i.quantity, amountCents: i.amountCents })),
         },

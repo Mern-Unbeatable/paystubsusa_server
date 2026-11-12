@@ -77,11 +77,42 @@ export const emailTemplates = {
     orderNumber: string;
     totalCents: number;
     paidAt?: string;
+    billedTo?: string;
+    cardBrand?: string | null;
+    cardLast4?: string | null;
+    receiptUrl?: string | null;
+    generatorUrl?: string;
     documentsUrl: string;
     lines: { name: string; quantity: number; amountCents: number }[];
   }): Rendered => {
     const paidOn = new Date(p.paidAt ?? Date.now()).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
     const cell = "padding:10px 20px;border-top:1px solid #e5e7eb";
+    const label = "font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px";
+    const value = "margin-top:4px;font-size:14px;font-weight:700;color:#111827;word-break:break-all";
+    const method = p.cardLast4 ? `${p.cardBrand ? p.cardBrand[0]!.toUpperCase() + p.cardBrand.slice(1) : "Card"} &bull;&bull;&bull;&bull; ${esc(p.cardLast4)}` : "Card";
+    const receiptUrl = p.receiptUrl?.startsWith("https://") ? p.receiptUrl : null;
+    const second = receiptUrl
+      ? { href: receiptUrl, text: "View Invoice" }
+      : p.generatorUrl
+        ? { href: p.generatorUrl, text: "Create Another Paystub" }
+        : null;
+    const meta = [
+      ["Invoice no.", esc(p.orderNumber)],
+      ["Date paid", paidOn],
+      ...(p.billedTo ? [["Billed to", esc(p.billedTo)]] : []),
+      ["Payment method", method],
+    ];
+    const metaRows = [];
+    for (let i = 0; i < meta.length; i += 2) {
+      metaRows.push(
+        `<tr>` +
+          meta
+            .slice(i, i + 2)
+            .map(([k, v]) => `<td width="50%" valign="top" style="padding:0 20px 14px"><div style="${label}">${k}</div><div style="${value}">${v}</div></td>`)
+            .join("") +
+          `</tr>`,
+      );
+    }
     const steps = [
       "Click <b>View My Documents</b> below.",
       "Sign in, or confirm this email address with a one-time code.",
@@ -90,18 +121,20 @@ export const emailTemplates = {
     return {
       subject: `Your Paystubs USA order ${p.orderNumber}`,
       text:
-        `Payment successful. Thanks for your purchase.\n\nOrder: ${p.orderNumber}\nDate: ${paidOn}\n\n` +
+        `Payment successful. Thanks for your purchase.\n\nInvoice: ${p.orderNumber}\nDate paid: ${paidOn}\n` +
+        (p.billedTo ? `Billed to: ${p.billedTo}\n` : "") +
+        `\n` +
         p.lines.map((l) => `${l.quantity} × ${l.name}: ${money(l.amountCents)}`).join("\n") +
-        `\nTotal paid: ${money(p.totalCents)}\n\nView your documents: ${p.documentsUrl}\n(You'll be asked to sign in or confirm your email.)`,
+        `\nTotal paid: ${money(p.totalCents)}\n\nView your documents: ${p.documentsUrl}\n(You'll be asked to sign in or confirm your email.)` +
+        (second ? `\n${second.text}: ${second.href}` : ""),
       html: cardLayout(
         "Payment successful",
-        `<p style="margin:0 0 28px;font-size:15px;line-height:22px;color:#1f2937">Thanks for your purchase! We're preparing your documents, and they'll be ready to download in a moment.</p>` +
-          `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px"><tr>` +
-          `<td width="50%" style="padding:0 6px 0 0"><div style="background:#eff1f0;border-radius:12px;padding:14px 16px;text-align:left"><div style="font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Order number</div><div style="margin-top:4px;font-size:15px;font-weight:700;color:#111827">${esc(p.orderNumber)}</div></div></td>` +
-          `<td width="50%" style="padding:0 0 0 6px"><div style="background:#eff1f0;border-radius:12px;padding:14px 16px;text-align:left"><div style="font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Date paid</div><div style="margin-top:4px;font-size:15px;font-weight:700;color:#111827">${paidOn}</div></div></td>` +
-          `</tr></table>` +
+        `<p style="margin:0 0 28px;font-size:15px;line-height:22px;color:#1f2937">Thanks for your purchase! Here is your invoice. We're preparing your documents, and they'll be ready to download in a moment.</p>` +
           `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:12px;text-align:left;font-size:14px;color:#1f2937;border-collapse:separate">` +
-          `<tr><td colspan="2" style="padding:14px 20px;font-size:13px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Order summary</td></tr>` +
+          `<tr><td style="padding:18px 20px;border-bottom:1px solid #e5e7eb;border-radius:12px 0 0 0;background:#f9fafb;font-size:18px;font-weight:700;color:#092258;letter-spacing:1px">INVOICE</td>` +
+          `<td align="right" style="padding:18px 20px;border-bottom:1px solid #e5e7eb;border-radius:0 12px 0 0;background:#f9fafb"><span style="display:inline-block;padding:4px 12px;background:#dcfce7;border-radius:999px;font-size:12px;font-weight:700;color:#15803d">PAID</span></td></tr>` +
+          `<tr><td colspan="2" style="padding:18px 0 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${metaRows.join("")}</table></td></tr>` +
+          `<tr><td style="padding:10px 20px;border-top:1px solid #e5e7eb;${label}">Description</td><td align="right" style="padding:10px 20px;border-top:1px solid #e5e7eb;${label}">Amount</td></tr>` +
           p.lines
             .map(
               (l) =>
@@ -111,8 +144,12 @@ export const emailTemplates = {
             .join("") +
           `<tr><td style="padding:16px 20px;background:#f9fafb;border-top:1px solid #e5e7eb;border-radius:0 0 0 12px;font-weight:700;font-size:16px">Total paid</td>` +
           `<td align="right" style="padding:16px 20px;background:#f9fafb;border-top:1px solid #e5e7eb;border-radius:0 0 12px 0;font-weight:700;font-size:18px;color:#092258">${money(p.totalCents)}</td></tr></table>` +
-          `<table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:28px auto 0"><tr><td style="background:#092258;border-radius:10px">` +
-          `<a href="${esc(p.documentsUrl)}" target="_blank" style="display:inline-block;padding:14px 36px;font-size:16px;font-weight:700;color:#ffffff;text-decoration:none">View My Documents</a></td></tr></table>` +
+          `<div style="margin:22px 0 0;text-align:center">` +
+          `<a href="${esc(p.documentsUrl)}" target="_blank" style="display:inline-block;margin:6px;padding:12px 24px;background:#092258;border:2px solid #092258;border-radius:10px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none">View My Documents</a>` +
+          (second
+            ? `<a href="${esc(second.href)}" target="_blank" style="display:inline-block;margin:6px;padding:12px 24px;background:#ffffff;border:2px solid #092258;border-radius:10px;font-size:15px;font-weight:700;color:#092258;text-decoration:none">${second.text}</a>`
+            : "") +
+          `</div>` +
           `<div style="margin:28px 0 0;padding:18px 20px;background:#eff6ff;border-radius:12px;text-align:left">` +
           `<div style="margin:0 0 10px;font-size:14px;font-weight:700;color:#092258">How to get your documents</div>` +
           steps
