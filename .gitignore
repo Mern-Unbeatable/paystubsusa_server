@@ -5,6 +5,6 @@ temp_auto_push.bat
 .mail/
 coverage/
 config.bat
-.env
-.env.*
 !.env.example
+.gitignore
+branch_structure.json
