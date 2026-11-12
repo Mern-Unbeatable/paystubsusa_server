@@ -217,6 +217,7 @@ export class OrdersService implements GuestOrderLinker {
         {
           orderNumber: order.orderNumber,
           totalCents: order.totalCents,
+          paidAt: paidAt.toISOString(),
           documentsUrl: `${env.APP_URL}/find-paystubs`,
           lines: order.items.map((i) => ({ name: i.name, quantity: i.quantity, amountCents: i.amountCents })),
         },
