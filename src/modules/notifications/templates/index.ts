@@ -239,6 +239,47 @@ export const emailTemplates = {
       tag: "contact-reply",
     };
   },
+
+  /** Sent when an admin suspends or reactivates an account; `message` is the admin's optional reason. */
+  account_status: (p: {
+    name: string;
+    status: "active" | "suspended";
+    message?: string;
+    loginUrl: string;
+    supportEmail: string;
+  }): Rendered => {
+    const firstName = p.name.trim().split(/\s+/)[0] || p.name;
+    const suspended = p.status === "suspended";
+    const title = suspended ? "Your account has been suspended" : "Your account has been reactivated";
+    const intro = suspended
+      ? "Your Paystubs USA account has been suspended, and you've been signed out on all devices. You won't be able to sign in until it's reactivated."
+      : "Your Paystubs USA account has been reactivated. You can sign in again.";
+    const help = suspended
+      ? "If you think this is a mistake, reply to this email and our support team will look into it."
+      : "Questions? Just reply to this email.";
+    return {
+      subject: title,
+      text: `Hi ${firstName},\n\n${intro}\n\n${p.message ? `Message from our team:\n${p.message}\n\n` : ""}${suspended ? "" : `Sign in: ${p.loginUrl}\n\n`}${help}\n\nPaystubs USA Support`,
+      html: cardLayout(
+        title,
+        `<p style="margin:0 0 20px;font-size:15px;line-height:22px;color:#1f2937;text-align:left">Hi ${esc(firstName)},</p>` +
+          `<p style="margin:0 0 24px;font-size:15px;line-height:22px;color:#1f2937;text-align:left">${esc(intro)}</p>` +
+          (p.message
+            ? `<div style="margin:0 0 24px;text-align:left"><div style="margin-bottom:8px;font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Message from our team</div>` +
+              `<div style="padding:14px 16px;background:#f9fafb;border-left:4px solid #092258;border-radius:8px;font-size:15px;line-height:23px;color:#1f2937;white-space:pre-wrap;word-break:break-word">${esc(p.message)}</div></div>`
+            : "") +
+          (suspended
+            ? ""
+            : `<div style="margin:0 0 24px;text-align:center">` +
+              `<a href="${esc(p.loginUrl)}" target="_blank" style="display:inline-block;margin:6px;padding:12px 24px;background:#092258;border:2px solid #092258;border-radius:10px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none">Sign In</a></div>`) +
+          `<p style="margin:0;font-size:14px;line-height:21px;color:#6b7280;text-align:left">${esc(help)}</p>`,
+        `<table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto 16px"><tr>` +
+          `<td style="width:56px;height:56px;background:${suspended ? "#fee2e2" : "#dcfce7"};border-radius:28px;text-align:center;line-height:56px;font-size:26px;color:${suspended ? "#b91c1c" : "#15803d"}">${suspended ? "&#9888;" : "&#10003;"}</td></tr></table>`,
+      ),
+      replyTo: p.supportEmail,
+      tag: "account-status",
+    };
+  },
 } as const;
 
 export type EmailTemplateName = keyof typeof emailTemplates;

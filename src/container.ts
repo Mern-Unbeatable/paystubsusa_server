@@ -214,6 +214,7 @@ export function createContainer(overrides: Partial<Integrations> = {}) {
     documents,
     subscriptions,
     audit,
+    notifications,
     tx,
   });
   const adminOps = new AdminOperationsService({
