@@ -6,7 +6,13 @@ import type { IdempotencyRepository } from "../db/idempotency.repository.ts";
 import { logger } from "../logger.ts";
 
 const TTL_MS = 24 * 60 * 60 * 1000;
+// Longer than any request can run (Stripe: 20 s x 3 attempts, transactions: 15 s). An unanswered
+// reservation older than this was orphaned by a crash or restart, which skips the "close" release.
+const ABANDONED_MS = 2 * 60 * 1000;
 const keySchema = z.uuid();
+
+const isAbandoned = (r: { expiresAt: Date; response: unknown }, now: number) =>
+  !r.response && r.expiresAt.getTime() - TTL_MS < now - ABANDONED_MS;
 
 /**
  * Requires `Idempotency-Key` (UUID). Successful (2xx) responses are stored for 24 h and replayed
@@ -29,7 +35,8 @@ export const idempotency =
     let reserved = await repo.reserve(key, scope, requestHash, new Date(Date.now() + TTL_MS));
     if (!reserved) {
       const existing = await repo.find(key);
-      if (existing && existing.expiresAt.getTime() < Date.now()) {
+      const now = Date.now();
+      if (existing && (existing.expiresAt.getTime() < now || isAbandoned(existing, now))) {
         await repo.release(key);
         reserved = await repo.reserve(key, scope, requestHash, new Date(Date.now() + TTL_MS));
       } else if (existing) {
