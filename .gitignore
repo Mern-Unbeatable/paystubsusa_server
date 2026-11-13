@@ -9,3 +9,6 @@ config.bat
 branch_structure.json
 temp_interactive_push.bat
 .gitignore
+.env.example
+.env
+.env.*
