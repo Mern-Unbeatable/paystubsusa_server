@@ -1,4 +1,4 @@
-import type { Prisma } from "../../generated/prisma/client.ts";
+import { Prisma } from "../../generated/prisma/client.ts";
 import { prisma } from "./prisma.ts";
 import type { IdempotencyRecord, IdempotencyRepository, StoredResponse } from "./idempotency.repository.ts";
 
@@ -18,6 +18,7 @@ export class PrismaIdempotencyRepository implements IdempotencyRepository {
       key: row.key,
       requestHash: row.requestHash,
       response: row.response as StoredResponse | null,
+      createdAt: row.createdAt,
       expiresAt: row.expiresAt,
     };
   }
@@ -35,5 +36,9 @@ export class PrismaIdempotencyRepository implements IdempotencyRepository {
 
   async deleteExpired(now: Date) {
     return (await prisma.idempotencyKey.deleteMany({ where: { expiresAt: { lt: now } } })).count;
+  }
+
+  async releaseInFlight() {
+    return (await prisma.idempotencyKey.deleteMany({ where: { response: { equals: Prisma.DbNull } } })).count;
   }
 }

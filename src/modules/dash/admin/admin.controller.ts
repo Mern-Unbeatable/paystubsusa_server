@@ -12,6 +12,7 @@ import { createContactMessageBody, listContactMessagesQuery, replyContactMessage
 import type { AdminCustomersService } from "./admin-customers.service.ts";
 import type { AdminDashboardService } from "./admin-dashboard.service.ts";
 import type { AdminOperationsService } from "./admin-operations.service.ts";
+import type { AdminSystemService } from "./admin-system.service.ts";
 import {
   adminDocumentsQuery,
   adminOrdersQuery,
@@ -26,6 +27,9 @@ import {
   idParams,
   productParams,
   refundBody,
+  systemRecordParams,
+  systemTableParams,
+  systemTableQuery,
   updateCustomerBody,
   updateProductBody,
   updateTemplateBody,
@@ -41,6 +45,7 @@ export interface AdminControllerDeps {
   subscriptions: SubscriptionsService;
   support: SupportService;
   audit: AuditService;
+  system: AdminSystemService;
 }
 
 const id = (req: Request) => parse(idParams, req.params).id;
@@ -225,5 +230,19 @@ export class AdminController {
   listAuditLogs = async (req: Request, res: Response) => {
     const { page, pageSize, ...filter } = parse(auditLogsQuery, req.query);
     res.json(await this.d.audit.list(filter, { page, pageSize }));
+  };
+
+  listSystemTable = async (req: Request, res: Response) => {
+    const { table } = parse(systemTableParams, req.params);
+    const { page, pageSize, ...filter } = parse(systemTableQuery, req.query);
+    // Admin lists must not be cached: a 304 has an empty body and the SPA would show 0 rows.
+    res.setHeader("Cache-Control", "private, no-store");
+    res.json(await this.d.system.list(table, filter, { page, pageSize }));
+  };
+
+  getSystemRecord = async (req: Request, res: Response) => {
+    const { table, id } = parse(systemRecordParams, req.params);
+    res.setHeader("Cache-Control", "private, no-store");
+    res.json({ data: await this.d.system.get(table, id) });
   };
 }
