@@ -62,5 +62,8 @@ export function adminRoutes(c: AdminController, users: UserRepository, idempoten
 
   router.get("/admin/audit-logs", c.listAuditLogs);
 
+  router.get("/admin/system/:table", c.listSystemTable);
+  router.get("/admin/system/:table/:id", c.getSystemRecord);
+
   return router;
 }

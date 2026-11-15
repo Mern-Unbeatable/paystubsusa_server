@@ -27,6 +27,17 @@ container.integrations.mailer
     ),
   );
 
+// Prior process died mid-request: in-flight keys have no response and would 409 for ~2 minutes.
+r.idempotency
+  .releaseInFlight()
+  .then((count) => {
+    if (count > 0)
+      logger.info({ count }, "Released orphaned in-flight idempotency keys");
+  })
+  .catch((err: unknown) =>
+    logger.error({ err }, "Failed to release orphaned idempotency keys"),
+  );
+
 const server = createApp(container).listen(env.PORT, () =>
   logger.info(
     { service: "paystubsusa-api", env: env.NODE_ENV, port: env.PORT },

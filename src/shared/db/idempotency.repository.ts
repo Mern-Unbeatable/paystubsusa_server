@@ -7,6 +7,7 @@ export interface IdempotencyRecord {
   key: string;
   requestHash: string;
   response: StoredResponse | null;
+  createdAt: Date;
   expiresAt: Date;
 }
 
@@ -17,4 +18,9 @@ export interface IdempotencyRepository {
   complete(key: string, response: StoredResponse): Promise<void>;
   release(key: string): Promise<void>;
   deleteExpired(now: Date): Promise<number>;
+  /**
+   * Drops in-flight rows with no stored response. Used on process boot: any prior
+   * in-flight request died with the old process and would otherwise 409 for ABANDONED_MS.
+   */
+  releaseInFlight(): Promise<number>;
 }

@@ -80,6 +80,7 @@ import {
   AdminCustomersService,
   AdminDashboardService,
   AdminOperationsService,
+  AdminSystemService,
   PrismaAdminCustomerRepository,
   PrismaAdminDashboardRepository,
 } from "./modules/dash/admin/index.ts";
@@ -276,6 +277,7 @@ export function createContainer(overrides: Partial<Integrations> = {}) {
         subscriptions,
         support,
         audit,
+        system: new AdminSystemService(),
       }),
     },
     checkDatabase: async () => {
