@@ -141,3 +141,27 @@ export const auditLogsQuery = z.object({
   from: dateFilter,
   to: dateFilter,
 });
+
+export const systemTableParams = z.object({
+  table: z.enum([
+    "audit-logs",
+    "jobs",
+    "idempotency-keys",
+    "entitlements",
+    "email-deliveries",
+    "verification-challenges",
+    "webhook-events",
+    "order-items",
+    "rate-limit-counters",
+  ]),
+});
+
+/** Idempotency keys and Stripe webhook ids are not UUIDs. */
+export const systemRecordParams = systemTableParams.extend({
+  id: z.string().trim().min(1).max(500),
+});
+
+export const systemTableQuery = z.object({
+  ...paginationQuery,
+  q,
+});

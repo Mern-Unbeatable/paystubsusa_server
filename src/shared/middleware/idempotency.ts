@@ -11,8 +11,8 @@ const TTL_MS = 24 * 60 * 60 * 1000;
 const ABANDONED_MS = 2 * 60 * 1000;
 const keySchema = z.uuid();
 
-const isAbandoned = (r: { expiresAt: Date; response: unknown }, now: number) =>
-  !r.response && r.expiresAt.getTime() - TTL_MS < now - ABANDONED_MS;
+const isAbandoned = (r: { createdAt: Date; response: unknown }, now: number) =>
+  !r.response && r.createdAt.getTime() < now - ABANDONED_MS;
 
 /**
  * Requires `Idempotency-Key` (UUID). Successful (2xx) responses are stored for 24 h and replayed
