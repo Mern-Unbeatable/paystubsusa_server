@@ -1,0 +1,7 @@
+/* index.css only shows the print root in print media; the renderer waits for it to be visible on screen too. */
+.paystub-print-root {
+  display: block;
+  width: 816px;
+  height: 1055px;
+  overflow: hidden;
+}

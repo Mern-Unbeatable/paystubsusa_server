@@ -3,6 +3,7 @@ node_modules/
 
 # Generated files
 src/generated/
+dist-renderer/
 
 # Storage and temporary files
 .storage/

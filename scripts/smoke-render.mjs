@@ -98,7 +98,7 @@ const samples = [
 const outDir = path.resolve(".storage/smoke-render");
 await mkdir(outDir, { recursive: true });
 
-// Rebuild note: ensure web/dist-renderer is fresh after renderer changes.
+// Rebuild note: run `npm run build:renderer` after changing server/renderer/.
 const renderer = new PlaywrightRenderer();
 try {
   for (const sample of samples) {

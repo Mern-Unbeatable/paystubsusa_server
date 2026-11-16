@@ -29,7 +29,10 @@ export class PlaywrightRenderer implements DocumentRenderer {
 
   private getBrowser() {
     this.browser ??= chromium
-      .launch({ executablePath: env.CHROMIUM_EXECUTABLE_PATH, args: ["--disable-dev-shm-usage"] })
+      .launch({
+        ...(env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: env.CHROMIUM_EXECUTABLE_PATH } : {}),
+        args: ["--disable-dev-shm-usage"],
+      })
       .then((b) => {
         b.on("disconnected", () => {
           logger.warn("Chromium disconnected; it will be relaunched on the next render");
@@ -55,9 +58,12 @@ export class PlaywrightRenderer implements DocumentRenderer {
   }
 
   async render(payload: RenderPayload): Promise<Buffer> {
-    if (!env.RENDERER_BUNDLE_PATH) throw new Error("RENDERER_BUNDLE_PATH is not configured");
     const bundle = path.resolve(env.RENDERER_BUNDLE_PATH);
-    if (!existsSync(bundle)) throw new Error(`Renderer bundle not found at ${bundle}`);
+    if (!existsSync(bundle)) {
+      throw new Error(
+        `Renderer bundle not found at ${bundle}; run npm run build:renderer (set RENDERER_BUNDLE_PATH if using a custom path)`,
+      );
+    }
     const bundleUrl = pathToFileURL(bundle).href;
 
     await this.acquire();

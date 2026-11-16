@@ -14,16 +14,9 @@ import { maintenanceJobs } from "./jobs/retention.job.ts";
 
 function assertRendererBundle() {
   if (!env.JOBS_ENABLED) return;
-  if (!env.RENDERER_BUNDLE_PATH) {
-    const msg =
-      "RENDERER_BUNDLE_PATH is not set; document PDF renders will fail";
-    if (isProduction) throw new Error(msg);
-    logger.warn(msg);
-    return;
-  }
   const bundle = path.resolve(env.RENDERER_BUNDLE_PATH);
   if (!existsSync(bundle)) {
-    const msg = `Renderer bundle not found at ${bundle}; run npm run build:renderer in web/`;
+    const msg = `Renderer bundle not found at ${bundle}; run npm run build:renderer`;
     if (isProduction) throw new Error(msg);
     logger.warn(msg);
   }
