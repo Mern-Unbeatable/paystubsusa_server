@@ -94,16 +94,31 @@ npm run smoke:render              # needs Chromium + dist-renderer/
 
 ## Deployment (Coolify)
 
-**Required:** Coolify Build Pack must be **Dockerfile** (not Nixpacks / Node). Otherwise Chromium is missing and every `render-document` job fails with `Executable doesn't exist at /root/.cache/ms-playwright/...`.
+**Required for PDFs:** the running image must include Chromium. Your crash `Chromium not found` means Coolify is still on **Nixpacks**, not the Dockerfile image.
+
+### Coolify → switch to Dockerfile
+1. Open the API application → **Configuration** → **General**.
+2. Under **Build pipeline**, set **Build strategy** (Build pack) to **Dockerfile** (not Nixpacks / Railpack).
+3. **Base Directory:** `/` (server repo root) — or `/server` only if Coolify points at the monorepo parent.
+4. **Dockerfile Location:** `/Dockerfile` (relative to Base Directory).
+5. **Port:** `3000` (match `PORT`).
+6. Environment (set explicitly; do not leave blank):
+   - `CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium`
+   - `LOCAL_STORAGE_DIR=/app/.storage`
+   - `TRUST_PROXY=1`
+7. **Persistent Storage:** mount a volume at `/app/.storage`.
+8. Save → **Redeploy** (force rebuild without cache if the old Nixpacks image is sticky).
+
+A `nixpacks.toml` is included as a fallback Chromium install if you stay on Nixpacks temporarily — **Dockerfile is still preferred**.
 
 | Setting | Value |
 |---|---|
-| Build Pack | Dockerfile |
-| Dockerfile location | `Dockerfile` at the **server** repo root (build context = that root) |
-| Start | `npm start` (image `CMD`) |
+| Build strategy | **Dockerfile** |
+| Dockerfile location | `/Dockerfile` at the server repo root |
+| Start | image `CMD` → `npm start` |
 | Pre-deploy | `npm run db:migrate` |
-| Port | `3000` (or match `PORT` in Coolify) |
-| Persistent storage | Volume mount `/app/.storage` |
+| Port | `3000` |
+| Persistent storage | `/app/.storage` |
 
 `npm run build` inside the image runs `prisma generate` and produces `/app/dist-renderer`. Env defaults in the image:
 
