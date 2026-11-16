@@ -14,22 +14,33 @@ import { maintenanceJobs } from "./jobs/retention.job.ts";
 
 function assertRendererBundle() {
   if (!env.JOBS_ENABLED) return;
-  if (!env.RENDERER_BUNDLE_PATH) {
-    const msg =
-      "RENDERER_BUNDLE_PATH is not set; document PDF renders will fail";
-    if (isProduction) throw new Error(msg);
-    logger.warn(msg);
-    return;
-  }
   const bundle = path.resolve(env.RENDERER_BUNDLE_PATH);
   if (!existsSync(bundle)) {
-    const msg = `Renderer bundle not found at ${bundle}; run npm run build:renderer in web/`;
+    const msg = `Renderer bundle not found at ${bundle}; run npm run build:renderer`;
     if (isProduction) throw new Error(msg);
     logger.warn(msg);
   }
 }
 
+function assertChromium() {
+  if (!env.JOBS_ENABLED) return;
+  const fromEnv = env.CHROMIUM_EXECUTABLE_PATH?.trim();
+  const candidates = [
+    fromEnv,
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/google-chrome",
+  ].filter((p): p is string => Boolean(p));
+  if (candidates.some((p) => existsSync(p))) return;
+  const msg =
+    "Chromium not found. Coolify must use the server Dockerfile and set CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium (do not leave it blank).";
+  if (isProduction) throw new Error(msg);
+  logger.warn(msg);
+}
+
 assertRendererBundle();
+assertChromium();
 
 const container = createContainer();
 const { services: s, repositories: r } = container;
