@@ -3,6 +3,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { chromium, type Browser } from "playwright-core";
 import { env } from "../config/env.ts";
+import { findChromiumExecutable } from "../shared/chromium.ts";
 import { logger } from "../shared/logger.ts";
 
 export interface RenderPayload {
@@ -18,29 +19,13 @@ export interface DocumentRenderer {
 
 const RENDER_TIMEOUT_MS = 20_000;
 
-/** Prefer env, then common Linux package paths (Docker/Coolify). Empty Coolify vars must not fall back to Playwright's cache. */
-const SYSTEM_CHROMIUM_CANDIDATES = [
-  "/usr/bin/chromium",
-  "/usr/bin/chromium-browser",
-  "/usr/bin/google-chrome",
-  "/usr/bin/google-chrome-stable",
-  "/usr/bin/chrome",
-];
-
 export function resolveChromiumExecutable(): string | undefined {
   const fromEnv = env.CHROMIUM_EXECUTABLE_PATH?.trim();
-  if (fromEnv) {
-    if (!existsSync(fromEnv)) {
-      throw new Error(
-        `CHROMIUM_EXECUTABLE_PATH is set to ${fromEnv} but that file does not exist. Install Chromium or fix the path.`,
-      );
-    }
-    return fromEnv;
+  // If Coolify sets a missing path (e.g. /usr/bin/chromium on Nixpacks), fall through to cache.
+  if (fromEnv && !existsSync(fromEnv)) {
+    logger.warn({ path: fromEnv }, "CHROMIUM_EXECUTABLE_PATH does not exist; trying system/Playwright cache");
   }
-  for (const candidate of SYSTEM_CHROMIUM_CANDIDATES) {
-    if (existsSync(candidate)) return candidate;
-  }
-  return undefined;
+  return findChromiumExecutable(fromEnv);
 }
 
 /**
