@@ -90,10 +90,20 @@ export function createApp(c: Container) {
   if (storage instanceof LocalStorage) {
     api.get("/local-files", async (req, res) => {
       const q = parse(localFileQuery, req.query);
-      const file = await storage
-        .read(q.key, q.name, q.exp, q.sig)
-        .catch(() => null);
-      if (!file) throw notFound();
+      const file = await storage.read(q.key, q.name, q.exp, q.sig).catch((err: unknown) => {
+        logger.error({ err, key: q.key }, "local-files read failed");
+        return { ok: false as const, reason: "invalid" as const };
+      });
+      if (!file.ok) {
+        if (file.reason === "missing") {
+          logger.warn({ key: file.key }, "local-files: PDF missing from LOCAL_STORAGE_DIR (check Coolify volume / regenerate)");
+          throw notFound(
+            "FILE_MISSING",
+            "This PDF file is missing from server storage. Ask an admin to regenerate the document.",
+          );
+        }
+        throw notFound();
+      }
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", file.disposition);
       res.send(file.body);

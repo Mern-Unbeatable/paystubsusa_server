@@ -63,8 +63,12 @@ export class LocalStorage implements ObjectStorage {
   }
 
   async read(key: string, fileName: string, exp: number, sig: string) {
-    if (exp < Date.now() / 1000 || !safeEqual(sig, signLocal(key, fileName, exp))) return null;
-    return { body: await readFile(this.resolve(key)), disposition: disposition(fileName) };
+    if (exp < Date.now() / 1000 || !safeEqual(sig, signLocal(key, fileName, exp))) {
+      return { ok: false as const, reason: "invalid" as const };
+    }
+    const body = await this.get(key);
+    if (!body) return { ok: false as const, reason: "missing" as const, key };
+    return { ok: true as const, body, disposition: disposition(fileName) };
   }
 
   async delete(key: string) {
