@@ -1,14 +1,20 @@
+# Dependencies
 node_modules/
+
+# Generated files
 src/generated/
+dist-renderer/
+
+# Storage and temporary files
 .storage/
 temp_auto_push.bat
+temp_interactive_push.bat
 .mail/
 coverage/
 config.bat
-!.env.example
 branch_structure.json
-temp_interactive_push.bat
-.gitignore
-.env.example
+
+# Environment variables
 .env
 .env.*
+!.env.example

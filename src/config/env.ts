@@ -1,3 +1,5 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
 const bool = z.enum(["true", "false"]).transform((v) => v === "true");
@@ -5,6 +7,12 @@ const pem = z
   .string()
   .min(1)
   .transform((v) => v.replace(/\\n/g, "\n"));
+
+/** Absolute path to the backend-owned offline renderer bundle (`npm run build:renderer`). */
+export const DEFAULT_RENDERER_BUNDLE_PATH = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../dist-renderer/index.html",
+);
 
 const schema = z
   .object({
@@ -50,8 +58,15 @@ const schema = z
     SUPPORT_EMAIL: z.string().email().default("support@paystubsusa.local"),
     LOCAL_MAIL_DIR: z.string().default(".mail"),
 
-    RENDERER_BUNDLE_PATH: z.string().optional(),
-    CHROMIUM_EXECUTABLE_PATH: z.string().optional(),
+    /** Offline HTML bundle for Playwright. Defaults to server/dist-renderer/index.html. */
+    RENDERER_BUNDLE_PATH: z
+      .string()
+      .optional()
+      .transform((v) => (v && v.trim() ? v.trim() : DEFAULT_RENDERER_BUNDLE_PATH)),
+    CHROMIUM_EXECUTABLE_PATH: z
+      .string()
+      .optional()
+      .transform((v) => (v && v.trim() ? v.trim() : undefined)),
     RENDER_CONCURRENCY: z.coerce.number().int().min(1).max(8).default(2),
 
     /** Local development only; refused in production. */
@@ -73,6 +88,14 @@ const schema = z
       // `log` only writes files, so in production no email would ever reach a customer.
       if (env.MAIL_DRIVER !== "smtp") ctx.addIssue({ code: "custom", path: ["MAIL_DRIVER"], message: "must be smtp in production" });
       if (!env.PUBLIC_API_URL) ctx.addIssue({ code: "custom", path: ["PUBLIC_API_URL"], message: "required in production" });
+      // Vite frontend origins are not this API — signed links / CORS confusion.
+      if (env.PUBLIC_API_URL && /:(5173|4173)(\/|$)/.test(env.PUBLIC_API_URL)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["PUBLIC_API_URL"],
+          message: "must be the public API origin (not the Vite frontend)",
+        });
+      }
       if (env.COOKIE_SECURE === false) ctx.addIssue({ code: "custom", path: ["COOKIE_SECURE"], message: "cannot be false in production" });
       if (!env.RATE_LIMIT_ENABLED) ctx.addIssue({ code: "custom", path: ["RATE_LIMIT_ENABLED"], message: "cannot be false in production" });
     }

@@ -1,0 +1,45 @@
+{
+  "company": {
+    "name": "Northwind Logistics LLC",
+    "address": "450 Market St",
+    "cityStateZip": "San Francisco, CA, 94105",
+    "ein": "EIN: 12-3456789"
+  },
+  "statement": {
+    "title": "EARNINGS STATEMENT",
+    "payDate": "Pay Date: 10/17/2026"
+  },
+  "employee": {
+    "name": "Jordan A. Miller",
+    "address": "88 Pine Ave",
+    "cityStateZip": "Oakland, CA, 94607"
+  },
+  "payPeriod": {
+    "dates": "10/1/2026 - 10/14/2026",
+    "frequency": "Bi-Weekly",
+    "id": "ID: EMP-0421"
+  },
+  "netPay": "$1,908.62",
+  "earnings": [
+    { "desc": "Regular", "rate": "80h × $28.00", "amount": "$2,240.00" },
+    { "desc": "Overtime", "rate": "4h × 1.5", "amount": "$168.00" },
+    { "desc": "Bonus", "rate": "", "amount": "$150.00" }
+  ],
+  "grossPay": "$2,558.00",
+  "taxes": [
+    { "desc": "Federal Income Tax", "amount": "$248.10" },
+    { "desc": "Social Security", "amount": "$153.08" },
+    { "desc": "Medicare", "amount": "$35.80" },
+    { "desc": "State Income Tax", "amount": "$92.40" }
+  ],
+  "totalTaxes": "$529.38",
+  "deductions": [
+    { "desc": "401(k)", "amount": "$120.00" }
+  ],
+  "totalDeductions": "$120.00",
+  "summary": {
+    "gross": "$2,558.00",
+    "deductions": "$649.38",
+    "net": "$1,908.62"
+  }
+}

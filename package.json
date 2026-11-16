@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "description": "PaystubsUSA API (Express modular monolith)",
   "scripts": {
-    "build": "prisma generate",
+    "build:renderer": "vite build --config renderer/vite.config.js",
+    "build": "prisma generate && npm run build:renderer",
     "dev": "node --watch --env-file-if-exists=.env src/server.ts",
     "start": "node --env-file-if-exists=.env src/server.ts",
     "typecheck": "tsc --noEmit",
@@ -14,7 +15,8 @@
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "db:seed": "prisma db seed",
-    "keys:generate": "node scripts/generate-keys.ts"
+    "keys:generate": "node scripts/generate-keys.ts",
+    "smoke:render": "node --env-file-if-exists=.env scripts/smoke-render.mjs"
   },
   "license": "UNLICENSED",
   "type": "module",
@@ -37,11 +39,14 @@
     "pino-http": "^11.0.0",
     "pino-pretty": "^13.2.0",
     "playwright-core": "^1.65.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
     "sharp": "^0.35.5",
     "stripe": "^23.1.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.1.18",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
@@ -49,10 +54,15 @@
     "@types/node": "^26.6.6",
     "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.23.1",
+    "@types/react": "^19.2.5",
+    "@types/react-dom": "^19.2.3",
     "@types/supertest": "^7.2.1",
+    "@vitejs/plugin-react": "^5.1.1",
     "prisma": "^7.10.1",
     "supertest": "^7.3.2",
+    "tailwindcss": "^4.1.18",
     "typescript": "^7.0.2",
+    "vite": "^7.2.4",
     "vitest": "^5.1.0"
   },
   "allowScripts": {

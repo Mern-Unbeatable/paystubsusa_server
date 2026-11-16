@@ -1,0 +1,13 @@
+node_modules
+dist-renderer
+.storage
+.mail
+.env
+.env.*
+!.env.example
+coverage
+**/*.md
+.git
+.gitignore
+src/old
+scripts/trace-renderer-deps.mjs

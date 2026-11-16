@@ -1,0 +1,78 @@
+[
+  {
+    "id": "01",
+    "title": "Template 01",
+    "subtitle": "Classic layout",
+    "headerVariant": "dark-full",
+    "netPayVariant": "dark",
+    "tableVariant": "light-blue"
+  },
+  {
+    "id": "02",
+    "title": "Template 02",
+    "subtitle": "Minimal layout",
+    "headerVariant": "minimal-blue-line",
+    "netPayVariant": "blue",
+    "tableVariant": "solid-blue"
+  },
+  {
+    "id": "03",
+    "title": "Template 03",
+    "subtitle": "Boxed layout",
+    "headerVariant": "boxed",
+    "netPayVariant": "blue",
+    "tableVariant": "light-blue"
+  },
+  {
+    "id": "04",
+    "title": "Template 04",
+    "subtitle": "Corporate layout",
+    "headerVariant": "split-dark",
+    "netPayVariant": "dark",
+    "tableVariant": "solid-dark"
+  },
+  {
+    "id": "05",
+    "title": "Template 05",
+    "subtitle": "Modern layout",
+    "headerVariant": "blue-full",
+    "netPayVariant": "blue",
+    "tableVariant": "solid-blue"
+  },
+  {
+    "id": "06",
+    "title": "Template 06",
+    "subtitle": "Executive layout",
+    "headerVariant": "minimal-dark-line",
+    "netPayVariant": "dark",
+    "tableVariant": "minimal-gray"
+  },
+  {
+    "id": "07",
+    "title": "Template 07",
+    "subtitle": "Detailed layout",
+    "headerVariant": "boxed",
+    "netPayVariant": "dark",
+    "tableVariant": "solid-dark"
+  },
+  {
+    "id": "08",
+    "title": "Template 08",
+    "subtitle": "Compact layout",
+    "headerVariant": "split-blue",
+    "netPayVariant": "blue",
+    "tableVariant": "light-blue"
+  },
+  {
+    "id": "09",
+    "title": "Template 09",
+    "subtitle": "Statement layout",
+    "document": "earnings-statement"
+  },
+  {
+    "id": "10",
+    "title": "Template 10",
+    "subtitle": "Check layout",
+    "document": "check-statement"
+  }
+]

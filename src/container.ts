@@ -263,7 +263,9 @@ export function createContainer(overrides: Partial<Integrations> = {}) {
       catalog: new CatalogController(catalog),
       documents: new DocumentsController(documents),
       orders: new OrdersController(orders, entitlements, webhooks),
-      payments: new PaymentsController(payments, webhooks, (userId) => subscriptions.reconcile(userId)),
+      payments: new PaymentsController(payments, webhooks, (userId) =>
+        subscriptions.reconcile(userId),
+      ),
       subscriptions: new SubscriptionsController(subscriptions),
       support: new SupportController(support),
       customerDashboard: new CustomerDashboardController(customerDashboard),

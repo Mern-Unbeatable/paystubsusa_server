@@ -17,5 +17,12 @@
     "resolveJsonModule": true,
     "isolatedModules": true
   },
-  "include": ["src", "prisma", "test", "scripts", "prisma.config.ts", "vitest.config.ts"]
+  "include": [
+    "src",
+    "prisma",
+    "test",
+    "scripts",
+    "prisma.config.ts",
+    "vitest.config.ts"
+  ]
 }
