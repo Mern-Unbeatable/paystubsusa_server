@@ -94,14 +94,16 @@ npm run smoke:render              # needs Chromium + dist-renderer/
 
 ## Deployment (Coolify)
 
-Prefer the **Dockerfile** in this directory so Chromium and OS font packages ship with the API. Set the build context to the `server` repository root (or monorepo subdirectory `server` if Coolify points at the parent).
+**Required:** Coolify Build Pack must be **Dockerfile** (not Nixpacks / Node). Otherwise Chromium is missing and every `render-document` job fails with `Executable doesn't exist at /root/.cache/ms-playwright/...`.
 
 | Setting | Value |
 |---|---|
-| Build | Dockerfile (`Dockerfile`) |
+| Build Pack | Dockerfile |
+| Dockerfile location | `Dockerfile` at the **server** repo root (build context = that root) |
 | Start | `npm start` (image `CMD`) |
 | Pre-deploy | `npm run db:migrate` |
-| Port | `4000` |
+| Port | `3000` (or match `PORT` in Coolify) |
+| Persistent storage | Volume mount `/app/.storage` |
 
 `npm run build` inside the image runs `prisma generate` and produces `/app/dist-renderer`. Env defaults in the image:
 
@@ -130,7 +132,7 @@ Prefer the **Dockerfile** in this directory so Chromium and OS font packages shi
 | `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM` | Gmail address, its App Password, the same Gmail address |
 | `SUPPORT_EMAIL` | Address that receives contact-form messages |
 | `RENDERER_BUNDLE_PATH` | Optional; image default `/app/dist-renderer/index.html` |
-| `CHROMIUM_EXECUTABLE_PATH` | Optional; image default `/usr/bin/chromium` |
+| `CHROMIUM_EXECUTABLE_PATH` | Set to `/usr/bin/chromium` (Dockerfile). **Do not leave blank in Coolify** — an empty value clears the image default and Playwright then looks for a missing browser cache |
 | `RENDER_CONCURRENCY` | Optional; default `2` |
 | `JOBS_ENABLED` | `true` (default) so PDF jobs run |
 

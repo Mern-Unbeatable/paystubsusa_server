@@ -18,6 +18,31 @@ export interface DocumentRenderer {
 
 const RENDER_TIMEOUT_MS = 20_000;
 
+/** Prefer env, then common Linux package paths (Docker/Coolify). Empty Coolify vars must not fall back to Playwright's cache. */
+const SYSTEM_CHROMIUM_CANDIDATES = [
+  "/usr/bin/chromium",
+  "/usr/bin/chromium-browser",
+  "/usr/bin/google-chrome",
+  "/usr/bin/google-chrome-stable",
+  "/usr/bin/chrome",
+];
+
+export function resolveChromiumExecutable(): string | undefined {
+  const fromEnv = env.CHROMIUM_EXECUTABLE_PATH?.trim();
+  if (fromEnv) {
+    if (!existsSync(fromEnv)) {
+      throw new Error(
+        `CHROMIUM_EXECUTABLE_PATH is set to ${fromEnv} but that file does not exist. Install Chromium or fix the path.`,
+      );
+    }
+    return fromEnv;
+  }
+  for (const candidate of SYSTEM_CHROMIUM_CANDIDATES) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return undefined;
+}
+
 /**
  * Renders through the offline template bundle (spec section 15). The bundle must expose
  * `window.renderDocument(payload)` and set `data-ready="true"` on its root once fonts are loaded.
@@ -28,10 +53,21 @@ export class PlaywrightRenderer implements DocumentRenderer {
   private readonly waiting: (() => void)[] = [];
 
   private getBrowser() {
-    this.browser ??= chromium
-      .launch({
-        ...(env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: env.CHROMIUM_EXECUTABLE_PATH } : {}),
-        args: ["--disable-dev-shm-usage"],
+    this.browser ??= Promise.resolve()
+      .then(() => {
+        const executablePath = resolveChromiumExecutable();
+        if (executablePath) {
+          logger.info({ executablePath }, "Launching Chromium for PDF rendering");
+        } else {
+          logger.warn(
+            "CHROMIUM_EXECUTABLE_PATH unset and no system Chromium found; trying Playwright cache (often missing in Coolify — use the server Dockerfile)",
+          );
+        }
+        // --no-sandbox: containers often run as root without a user namespace.
+        return chromium.launch({
+          ...(executablePath ? { executablePath } : {}),
+          args: ["--disable-dev-shm-usage", "--no-sandbox", "--disable-gpu"],
+        });
       })
       .then((b) => {
         b.on("disconnected", () => {
@@ -42,7 +78,10 @@ export class PlaywrightRenderer implements DocumentRenderer {
       })
       .catch((err: unknown) => {
         this.browser = undefined;
-        throw err;
+        const tip =
+          " Use the server Dockerfile (Build Pack = Dockerfile), set CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium, and redeploy.";
+        const message = err instanceof Error ? err.message : String(err);
+        throw new Error(`Chromium launch failed: ${message}.${tip}`, { cause: err });
       });
     return this.browser;
   }
