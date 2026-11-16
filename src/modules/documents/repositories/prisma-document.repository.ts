@@ -142,7 +142,15 @@ export class PrismaDocumentRepository implements DocumentRepository {
         formDataKeyId: true,
         createdAt: true,
         renderedAt: true,
+        pdfStorageKey: true,
         template: { select: { code: true, renderer: true, variant: true } },
+        order: {
+          select: {
+            email: true,
+            userId: true,
+            user: { select: { name: true } },
+          },
+        },
       },
     });
   }
@@ -195,5 +203,33 @@ export class PrismaDocumentRepository implements DocumentRepository {
     return prisma.document.count({
       where: { createdAt: { gte: since }, order: { userId, items: { some: { productCode } } } },
     });
+  }
+
+  async ownerMonthSequence(input: {
+    documentId: string;
+    createdAt: Date;
+    email: string;
+    userId: string | null;
+  }) {
+    const y = input.createdAt.getUTCFullYear();
+    const m = input.createdAt.getUTCMonth();
+    const start = new Date(Date.UTC(y, m, 1));
+    const end = new Date(Date.UTC(y, m + 1, 1));
+    const owner =
+      input.userId != null
+        ? { userId: input.userId }
+        : { userId: null as string | null, email: { equals: input.email, mode: "insensitive" as const } };
+
+    const ahead = await prisma.document.count({
+      where: {
+        createdAt: { gte: start, lt: end },
+        order: owner,
+        OR: [
+          { createdAt: { lt: input.createdAt } },
+          { createdAt: input.createdAt, id: { lt: input.documentId } },
+        ],
+      },
+    });
+    return ahead + 1;
   }
 }

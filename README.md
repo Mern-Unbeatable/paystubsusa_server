@@ -28,6 +28,17 @@ Local webhooks: `stripe listen --forward-to localhost:4000/api/v1/webhooks/strip
 
 Files (avatars, PDFs) are stored under `LOCAL_STORAGE_DIR` (`.storage/`). Email goes through SMTP (`MAIL_DRIVER=smtp`), or in development is written to `.mail/` (`MAIL_DRIVER=log`). Production refuses to start without SMTP, `PUBLIC_API_URL` and secure cookies.
 
+PDF keys use: `documents/{email-prefix}_{id6}/{YYYY}/{MM}/{type}_{NNN}.pdf`.
+The email local-part is the visible owner folder; `id6` (user id or email hash) prevents collisions when two people share the same prefix. Access is only via signed `/api/v1/local-files` links — never browse the filesystem directly.
+
+To remap legacy UUID / dated-name folders:
+
+```bash
+node --env-file-if-exists=.env scripts/migrate-document-storage-keys.mjs          # dry-run
+node --env-file-if-exists=.env scripts/migrate-document-storage-keys.mjs --apply
+node --env-file-if-exists=.env scripts/migrate-document-storage-keys.mjs --apply --delete-old
+```
+
 ## Tests
 
 ```bash

@@ -1,15 +1,28 @@
 import { createHmac } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { env, publicApiUrl } from "../config/env.ts";
+import { env } from "../config/env.ts";
 import { safeEqual } from "../shared/crypto/tokens.ts";
+
+/** Document PDF path helpers — single place for folder/file naming under LOCAL_STORAGE_DIR. */
+export {
+  buildDocumentStorageKey,
+  isCurrentDocumentStorageKey,
+  ownerDirectory,
+  ownerId6,
+  sanitizeSlug,
+  type DocumentStorageKeyInput,
+} from "../modules/documents/storage-key.ts";
 
 /** Storage port; the container picks the implementation, so another provider can be added behind it. */
 export interface ObjectStorage {
   put(key: string, body: Buffer, contentType: string): Promise<void>;
   /** Null when the object does not exist. */
   get(key: string): Promise<Buffer | null>;
-  /** Short-lived GET URL that downloads as `fileName`. */
+  /**
+   * Short-lived download path under `/api/v1` (e.g. `/local-files?...`).
+   * Clients resolve it against their API base URL (same pattern as avatar URLs).
+   */
   presignDownload(key: string, fileName: string, ttlSeconds: number): Promise<string>;
   delete(key: string): Promise<void>;
 }
@@ -46,7 +59,7 @@ export class LocalStorage implements ObjectStorage {
     const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
     const sig = signLocal(key, fileName, exp);
     const qs = new URLSearchParams({ key, name: fileName, exp: String(exp), sig });
-    return `${publicApiUrl}/api/v1/local-files?${qs}`;
+    return `/local-files?${qs}`;
   }
 
   async read(key: string, fileName: string, exp: number, sig: string) {

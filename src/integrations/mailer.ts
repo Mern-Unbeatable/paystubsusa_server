@@ -85,7 +85,9 @@ export class FileMailer implements Mailer {
     await writeFile(
       path.join(env.LOCAL_MAIL_DIR, `${id}.txt`),
       `To: ${email.to}\nSubject: ${email.subject}\n` +
-        (email.attachments?.length ? `Attachments: ${email.attachments.map((a) => a.filename).join(", ")}\n` : "") +
+        (email.attachments?.length
+          ? `Attachments: ${email.attachments.map((a) => a.filename).join(", ")}\n`
+          : "") +
         `\n${email.text}\n`,
       "utf8",
     );

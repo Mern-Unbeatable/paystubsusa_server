@@ -15,6 +15,7 @@ import type { NotificationsService } from "../notifications/notifications.servic
 import { env } from "../../config/env.ts";
 import { logger } from "../../shared/logger.ts";
 import { validateFormData, type DisplayFields } from "./form-data.ts";
+import { buildDocumentStorageKey } from "./storage-key.ts";
 import type { DocumentListFilter, DocumentRepository, DocumentWithOrder } from "./repositories/document.repository.ts";
 
 export const DOWNLOAD_URL_TTL_SECONDS = 5 * 60;
@@ -191,11 +192,30 @@ export class DocumentsService {
       if (!doc.formDataEnc || !doc.formDataKeyId) throw new Error("Form data is not available");
       const formData = decryptJson(doc.formDataEnc, doc.formDataKeyId);
       const pdf = await this.d.renderer.render({ type: doc.type, template: doc.template, formData });
-      const yyyy = doc.createdAt.getUTCFullYear();
-      const mm = String(doc.createdAt.getUTCMonth() + 1).padStart(2, "0");
-      const key = `documents/${yyyy}/${mm}/${doc.orderId}/${doc.id}.pdf`;
+      const sequence = await this.d.documents.ownerMonthSequence({
+        documentId: doc.id,
+        createdAt: doc.createdAt,
+        email: doc.order.email,
+        userId: doc.order.userId,
+      });
+      const key = buildDocumentStorageKey({
+        createdAt: doc.createdAt,
+        email: doc.order.email,
+        userId: doc.order.userId,
+        type: doc.type,
+        sequence,
+      });
+      const previousKey = doc.pdfStorageKey;
       await this.d.storage.put(key, pdf, "application/pdf");
       await this.d.documents.markReady(doc.id, key, sha256(pdf));
+      if (previousKey && previousKey !== key) {
+        await this.d.storage.delete(previousKey).catch((err: unknown) =>
+          logger.warn(
+            { documentId: doc.id, previousKey, err: err instanceof Error ? err.message : "unknown" },
+            "Could not delete previous PDF after path change",
+          ),
+        );
+      }
       if (!doc.renderedAt) await this.emailFirstRender(doc.id);
     } catch (err) {
       if (ctx.isFinalAttempt) {

@@ -58,7 +58,14 @@ export interface RenderableDocument {
   createdAt: Date;
   /** Null until the first successful render; regenerations keep it. */
   renderedAt: Date | null;
+  /** Previous object key when regenerating; used to delete orphans after a path change. */
+  pdfStorageKey: string | null;
   template: { code: string; renderer: string; variant: unknown };
+  order: {
+    email: string;
+    userId: string | null;
+    user: { name: string } | null;
+  };
 }
 
 export interface NewDocument {
@@ -97,4 +104,14 @@ export interface DocumentRepository {
   clearPdf(id: string): Promise<void>;
   /** Documents created under the given subscription product since `since` (fair use). */
   countSubscriptionDocumentsSince(userId: string, productCode: string, since: Date): Promise<number>;
+  /**
+   * 1-based stable index of this document among the same owner's docs in the same UTC year/month
+   * (ordered by createdAt, id). Used for `{type}_{NNN}.pdf` filenames.
+   */
+  ownerMonthSequence(input: {
+    documentId: string;
+    createdAt: Date;
+    email: string;
+    userId: string | null;
+  }): Promise<number>;
 }
