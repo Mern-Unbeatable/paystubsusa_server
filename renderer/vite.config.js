@@ -30,7 +30,11 @@ export default defineConfig({
     {
       name: "renderer-index-html",
       generateBundle() {
-        this.emitFile({ type: "asset", fileName: "index.html", source: INDEX_HTML });
+        this.emitFile({
+          type: "asset",
+          fileName: "index.html",
+          source: INDEX_HTML,
+        });
       },
     },
   ],
