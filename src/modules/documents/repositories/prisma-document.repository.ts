@@ -170,7 +170,7 @@ export class PrismaDocumentRepository implements DocumentRepository {
     await prisma.document.update({ where: { id }, data: { downloadCount: { increment: 1 } } });
   }
 
-  async requeue(id: string, tx: Tx) {
+  async requeue(id: string, tx?: Tx) {
     const { count } = await dbOf(tx).document.updateMany({
       where: { id, status: { in: ["ready", "failed", "queued"] }, purgedAt: null, formDataEnc: { not: null } },
       data: { status: "queued" },
