@@ -3,10 +3,14 @@ import { amountToCheckWords } from "../utils/numberToWords";
 import { toLogoSrc } from "../utils/readLogoFile";
 
 const PERIODS_PER_YEAR = {
+  Daily: 365,
   Weekly: 52,
   "Bi-Weekly": 26,
   "Semi-Monthly": 24,
   Monthly: 12,
+  Quarterly: 4,
+  "Semi-Annually": 2,
+  Annually: 1,
 };
 
 const parseIsoDate = (iso) => {

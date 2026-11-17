@@ -34,7 +34,15 @@ export type PaystubPayDetails = {
   payPeriodStart: string;
   payPeriodEnd: string;
   payDate: string;
-  payFrequency: "Weekly" | "Bi-Weekly" | "Semi-Monthly" | "Monthly";
+  payFrequency:
+    | "Daily"
+    | "Weekly"
+    | "Bi-Weekly"
+    | "Semi-Monthly"
+    | "Monthly"
+    | "Quarterly"
+    | "Semi-Annually"
+    | "Annually";
   payType: "Hourly" | "Salary";
   hourlyRate: string;
   regularHours: string;
