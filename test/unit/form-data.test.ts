@@ -6,6 +6,7 @@ import {
   paystubFieldsForRender,
   validateFormData,
 } from "../../src/modules/documents/form-data.ts";
+import { applyPaystubDdSlipEntitlement } from "../../src/modules/documents/paystub-form.ts";
 import { AppError } from "../../src/shared/http/app-error.ts";
 import { paystubForm } from "../fixtures.ts";
 
@@ -137,5 +138,63 @@ describe("validateFormData", () => {
     expect(flat.directDeposit.routingNumber).toBe("021000021");
     const fromStored = paystubFieldsForRender(stub);
     expect(fromStored.directDeposit.bankName).toBe("Chase");
+  });
+
+  it("requires bank fields when the Direct Deposit Slip was purchased", async () => {
+    const entitled = applyPaystubDdSlipEntitlement(
+      {
+        ...paystubForm(),
+        directDeposit: { enabled: false },
+      },
+      true,
+    );
+    const err = await validateFormData("paystub", entitled).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(AppError);
+    const errors = (err as AppError).errors ?? {};
+    expect(Object.keys(errors).some((k) => k.includes("directDeposit"))).toBe(true);
+  });
+
+  it("persists includeInPdf false when the slip was not purchased even if bank details are filled", async () => {
+    const entitled = applyPaystubDdSlipEntitlement(
+      {
+        ...paystubForm(),
+        directDeposit: {
+          enabled: true,
+          bankName: "Chase",
+          accountHolderName: "Jane Doe",
+          accountNumber: "123456789",
+          routingNumber: "021000021",
+          includeInPdf: true,
+        },
+      },
+      false,
+    );
+    const { data } = await validateFormData("paystub", entitled);
+    const stub = data as {
+      steps: { directDeposit: { enabled: boolean; includeInPdf?: boolean } };
+    };
+    expect(stub.steps.directDeposit.enabled).toBe(true);
+    expect(stub.steps.directDeposit.includeInPdf).toBe(false);
+  });
+
+  it("persists includeInPdf true when the slip was purchased with valid bank details", async () => {
+    const entitled = applyPaystubDdSlipEntitlement(
+      {
+        ...paystubForm(),
+        directDeposit: {
+          enabled: true,
+          bankName: "Chase",
+          accountHolderName: "Jane Doe",
+          accountNumber: "123456789",
+          routingNumber: "021000021",
+        },
+      },
+      true,
+    );
+    const { data } = await validateFormData("paystub", entitled);
+    const stub = data as {
+      steps: { directDeposit: { includeInPdf?: boolean } };
+    };
+    expect(stub.steps.directDeposit.includeInPdf).toBe(true);
   });
 });

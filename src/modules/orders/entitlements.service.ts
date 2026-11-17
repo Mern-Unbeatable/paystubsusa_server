@@ -4,7 +4,10 @@ import type { TransactionManager, Tx } from "../../shared/db/transaction.ts";
 import { canAccessOrder, DOWNLOADABLE_ORDER_STATUSES } from "../../shared/policies/access.ts";
 import type { GuestPrincipal, UserPrincipal } from "../../shared/types.ts";
 import type { CatalogService } from "../catalog/index.ts";
-import type { DocumentsService } from "../documents/index.ts";
+import {
+  applyPaystubDdSlipEntitlement,
+  type DocumentsService,
+} from "../documents/index.ts";
 import type { EntitlementRepository } from "./repositories/entitlement.repository.ts";
 
 interface Deps {
@@ -39,7 +42,15 @@ export class EntitlementsService {
     if (ent.creditsUsed >= ent.creditsTotal) throw conflict("NO_CREDITS_REMAINING", "You have no paystub credits left on this order");
 
     await this.d.catalog.requireActiveTemplate(input.templateId, ent.documentType);
-    const prepared = await this.d.documents.prepare(ent.documentType, input.formData);
+    // Credit-redeemed paystubs never include a paid Direct Deposit Slip.
+    const formDataForStore =
+      ent.documentType === "paystub"
+        ? applyPaystubDdSlipEntitlement(input.formData, false)
+        : input.formData;
+    const prepared = await this.d.documents.prepare(
+      ent.documentType,
+      formDataForStore,
+    );
 
     const doc = await this.d.tx.run(async (tx) => {
       if (!(await this.d.entitlements.consumeCredit(ent.id, tx))) {

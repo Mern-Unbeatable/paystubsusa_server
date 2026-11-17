@@ -7,12 +7,25 @@ const maskAccount = (value) => {
 };
 
 /**
+ * Paid add-on / legacy gate for the detachable slip.
+ * - includeInPdf === true → purchased (new checkouts)
+ * - includeInPdf === false → explicitly not purchased
+ * - includeInPdf omitted → legacy docs paid while the slip was free (`enabled`)
+ */
+export const shouldRenderDirectDepositSlip = (dd) => {
+  if (!dd) return false;
+  if (dd.includeInPdf === true) return true;
+  if (dd.includeInPdf === false) return false;
+  return Boolean(dd.enabled);
+};
+
+/**
  * Detachable direct-deposit advice printed under the paystub.
  * Net amount must come from `data.directDeposit` (built from calculation.netPay).
  */
 const DirectDepositSlip = ({ data }) => {
   const dd = data?.directDeposit;
-  if (!dd?.enabled) return null;
+  if (!shouldRenderDirectDepositSlip(dd)) return null;
 
   return (
     <div

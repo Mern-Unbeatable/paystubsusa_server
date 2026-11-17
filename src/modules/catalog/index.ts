@@ -6,6 +6,7 @@ export {
   toProductDto,
   toTemplateDto,
   MAX_ADDITIONAL_PAYSTUBS,
+  PAYSTUB_DD_SLIP_PRODUCT_CODE,
   SYSTEM_PRODUCT_CODES,
   type Quote,
   type QuoteLine,

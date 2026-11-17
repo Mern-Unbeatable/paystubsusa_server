@@ -21,6 +21,7 @@ import {
 
 export type { PaystubFormDataV2, PaystubRenderFields } from "./paystub-form.ts";
 export {
+  applyPaystubDdSlipEntitlement,
   flattenPaystubSteps,
   normalizePaystubFormData,
   PAYSTUB_SCHEMA_VERSION,

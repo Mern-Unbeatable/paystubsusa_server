@@ -146,6 +146,8 @@ const bankAccountNumber = z
 const paystubDirectDeposit = z
   .object({
     enabled: z.boolean().default(false),
+    /** Set only by the server from purchased order lines; omit on legacy docs. */
+    includeInPdf: z.boolean().optional(),
     bankName: optional(100),
     accountHolderName: optional(100),
     accountNumber: z.string().trim().optional().default(""),
@@ -178,9 +180,11 @@ const paystubDirectDeposit = z
     }
   })
   .transform((d) => {
+    const includeInPdf = d.includeInPdf;
     if (!d.enabled) {
       return {
         enabled: false,
+        ...(includeInPdf === undefined ? {} : { includeInPdf }),
         bankName: "",
         accountHolderName: "",
         accountNumber: "",
@@ -190,6 +194,7 @@ const paystubDirectDeposit = z
     }
     return {
       enabled: true,
+      ...(includeInPdf === undefined ? {} : { includeInPdf }),
       bankName: d.bankName ?? "",
       accountHolderName: d.accountHolderName ?? "",
       accountNumber: bankAccountNumber.parse(d.accountNumber),

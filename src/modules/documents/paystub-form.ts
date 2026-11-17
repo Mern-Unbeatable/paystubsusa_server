@@ -55,6 +55,11 @@ export type PaystubPayDetails = {
 
 export type PaystubDirectDeposit = {
   enabled: boolean;
+  /**
+   * Paid-checkout entitlement for the detachable slip.
+   * `true` = purchased; `false` = explicitly not purchased; omitted = legacy (pre-addon) docs.
+   */
+  includeInPdf?: boolean;
   bankName: string;
   accountHolderName: string;
   accountNumber: string;
@@ -92,6 +97,31 @@ const emptyDd = (): PaystubDirectDeposit => ({
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+/**
+ * Server-only PDF entitlement for the Direct Deposit Slip.
+ * Never trust a client-sent `includeInPdf`; overwrite from purchase / redeem path.
+ */
+export function applyPaystubDdSlipEntitlement(
+  formData: unknown,
+  purchased: boolean,
+): unknown {
+  const normalized = normalizePaystubFormData(formData);
+  if (!isRecord(normalized) || !isRecord(normalized.steps)) return formData;
+  const prev = isRecord(normalized.steps.directDeposit)
+    ? normalized.steps.directDeposit
+    : {};
+  const directDeposit = purchased
+    ? { ...prev, enabled: true, includeInPdf: true }
+    : { ...prev, includeInPdf: false };
+  return {
+    ...normalized,
+    steps: {
+      ...normalized.steps,
+      directDeposit,
+    },
+  };
 }
 
 /** True when payload already uses the step-based shape. */

@@ -101,6 +101,10 @@ export const buildPaystubDocument = (formData, calculations) => {
 
   const dd = formData.directDeposit ?? {};
   const ddEnabled = Boolean(dd.enabled);
+  // Live preview: enabled with no includeInPdf flag. Final PDF: includeInPdf from server.
+  const showDdSlip =
+    dd.includeInPdf === true ||
+    (dd.includeInPdf == null && ddEnabled);
   const checkNumber =
     (ddEnabled && String(dd.checkNumber || "").trim()) ||
     stableDigits(`${seed}|check`, 6);
@@ -163,10 +167,13 @@ export const buildPaystubDocument = (formData, calculations) => {
       clock: stableDigits(`${seed}|clock`, 5),
       voucher: checkNumber.slice(-5),
     },
-    distributionType: ddEnabled ? "Direct Deposit" : "Check",
+    distributionType: showDdSlip ? "Direct Deposit" : "Check",
     directDeposit: ddEnabled
       ? {
           enabled: true,
+          ...(dd.includeInPdf === undefined
+            ? {}
+            : { includeInPdf: dd.includeInPdf }),
           bankName: dd.bankName || "",
           accountHolderName: dd.accountHolderName || "",
           accountNumber: dd.accountNumber || "",
@@ -177,6 +184,11 @@ export const buildPaystubDocument = (formData, calculations) => {
           netPayText: money(calculations.netPay),
           netWords: amountToCheckWords(calculations.netPay),
         }
-      : { enabled: false },
+      : {
+          enabled: false,
+          ...(dd.includeInPdf === undefined
+            ? {}
+            : { includeInPdf: dd.includeInPdf }),
+        },
   };
 };

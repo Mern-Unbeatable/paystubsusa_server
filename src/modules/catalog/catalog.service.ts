@@ -24,6 +24,9 @@ import type {
 
 export const MAX_ADDITIONAL_PAYSTUBS = 50;
 
+/** Paid Direct Deposit Slip add-on for one-time paystub checkouts ($1.99). */
+export const PAYSTUB_DD_SLIP_PRODUCT_CODE = "paystub_dd_slip";
+
 /**
  * Seeded templates the generator also bundles (by code) as its offline fallback; they can be
  * restyled while unused, but never deleted. A restyle shows only when the API is reachable.
@@ -52,6 +55,7 @@ export const SYSTEM_PRODUCT_CODES: ReadonlySet<string> = new Set([
   "paystub_single",
   "paystub_pack_3",
   "paystub_additional",
+  PAYSTUB_DD_SLIP_PRODUCT_CODE,
   "w2_single",
   "nec1099_single",
   "direct_deposit_single",
@@ -144,8 +148,8 @@ export class CatalogService {
 
   /**
    * Server-side price from `products` (spec section 14.2). Rules: one base product with
-   * quantity 1; only paystubs take the `paystub_additional` add-on (0–50); the subscription
-   * plan is quoted alone.
+   * quantity 1; paystub add-ons are `paystub_additional` (1–50) and optional `paystub_dd_slip`
+   * (qty 1); the subscription plan is quoted alone.
    */
   async quote(items: { productCode: string; quantity: number }[]): Promise<Quote> {
     if (items.length === 0) throw itemsError("Add at least one product");
@@ -172,6 +176,12 @@ export class CatalogService {
     for (const a of addons) {
       if (a.product.documentType !== documentType || documentType !== "paystub") {
         throw itemsError(`${a.product.name} can't be added to this package`);
+      }
+      if (a.product.code === PAYSTUB_DD_SLIP_PRODUCT_CODE) {
+        if (a.quantity !== 1) {
+          throw itemsError("Direct Deposit Slip quantity must be 1");
+        }
+        continue;
       }
       if (a.quantity < 1 || a.quantity > MAX_ADDITIONAL_PAYSTUBS) {
         throw itemsError(`Additional paystubs must be between 1 and ${MAX_ADDITIONAL_PAYSTUBS}`);

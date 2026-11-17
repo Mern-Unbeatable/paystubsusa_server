@@ -9,8 +9,14 @@ import type { GuestPrincipal, Principal, RequestContext, UserPrincipal } from ".
 import { logger } from "../../shared/logger.ts";
 import type { AuditService } from "../audit/index.ts";
 import type { UserRepository, GuestOrderLinker } from "../auth/index.ts";
-import type { CatalogService } from "../catalog/index.ts";
-import type { DocumentsService } from "../documents/index.ts";
+import {
+  PAYSTUB_DD_SLIP_PRODUCT_CODE,
+  type CatalogService,
+} from "../catalog/index.ts";
+import {
+  applyPaystubDdSlipEntitlement,
+  type DocumentsService,
+} from "../documents/index.ts";
 import type { NotificationsService } from "../notifications/index.ts";
 import type { PaymentsService } from "../payments/index.ts";
 import type { SubscriptionsService } from "../subscriptions/index.ts";
@@ -95,7 +101,18 @@ export class OrdersService implements GuestOrderLinker {
       throw validation({ items: ["These products don't match the document type"] });
     }
 
-    const prepared = await this.d.documents.prepare(input.documentType, input.formData);
+    const ddSlipPurchased =
+      !quote.isSubscription &&
+      input.documentType === "paystub" &&
+      quote.lines.some((l) => l.productCode === PAYSTUB_DD_SLIP_PRODUCT_CODE);
+    const formDataForStore =
+      input.documentType === "paystub"
+        ? applyPaystubDdSlipEntitlement(input.formData, ddSlipPurchased)
+        : input.formData;
+    const prepared = await this.d.documents.prepare(
+      input.documentType,
+      formDataForStore,
+    );
     const now = new Date();
     const isFree = totalCents === 0;
 

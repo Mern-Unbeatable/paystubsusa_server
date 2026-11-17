@@ -69,18 +69,30 @@ export const buildThumbnailData = (formData, calculations) => {
     period: {
       payDate: formatDate(formData.payDate),
     },
-    directDeposit: formData.directDeposit?.enabled
-      ? {
-          enabled: true,
-          bankName: formData.directDeposit.bankName || "",
-          accountHolderName: formData.directDeposit.accountHolderName || "",
-          accountNumber: formData.directDeposit.accountNumber || "",
-          routingNumber: formData.directDeposit.routingNumber || "",
-          checkNumber: formData.directDeposit.checkNumber || "",
-          netPay: calculations.netPay,
-          netPayText: formatCurrency(calculations.netPay),
-          netWords: amountToCheckWords(calculations.netPay),
-        }
-      : { enabled: false },
+    directDeposit: (() => {
+      const dd = formData.directDeposit ?? {};
+      if (!dd.enabled) {
+        return {
+          enabled: false,
+          ...(dd.includeInPdf === undefined
+            ? {}
+            : { includeInPdf: dd.includeInPdf }),
+        };
+      }
+      return {
+        enabled: true,
+        ...(dd.includeInPdf === undefined
+          ? {}
+          : { includeInPdf: dd.includeInPdf }),
+        bankName: dd.bankName || "",
+        accountHolderName: dd.accountHolderName || "",
+        accountNumber: dd.accountNumber || "",
+        routingNumber: dd.routingNumber || "",
+        checkNumber: dd.checkNumber || "",
+        netPay: calculations.netPay,
+        netPayText: formatCurrency(calculations.netPay),
+        netWords: amountToCheckWords(calculations.netPay),
+      };
+    })(),
   };
 };
