@@ -182,6 +182,8 @@ const EarningsStatementTemplate = ({ data }) => {
       <div style={at(145, 186, { fontSize: 10.5, lineHeight: "14.5px" })}>
         {[
           ["Social Security Number:", employee.ssnMasked],
+          ["Marital Status:", employee.maritalStatus || "—"],
+          ["Exemptions:", employee.exemptions || "—"],
           ["Pay Frequency:", period.frequency],
           ["Employer EIN:", company.ein],
           ["Employee ID:", employee.id],

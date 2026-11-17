@@ -276,6 +276,8 @@ const CheckStatementTemplate = ({ data }) => {
             ["Employee Net pay", totals.net],
             ["Distribution Type", data.distributionType],
             ["Pay Frequency", period.frequency],
+            ["Marital Status", employee.maritalStatus || "—"],
+            ["Exemptions", employee.exemptions || "—"],
           ].map(([label, value], index) => (
             <div
               key={label}

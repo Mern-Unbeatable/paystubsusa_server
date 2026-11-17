@@ -8,6 +8,7 @@ import {
   buildThumbnailData,
   hasTemplateDocument,
 } from "../../../templates";
+import DirectDepositSlip from "../../../templates/DirectDepositSlip";
 
 const PRINT_MARGIN = 32;
 
@@ -33,6 +34,7 @@ const PaystubPrintDocument = ({ template, formData, calculations }) => {
         }}
       >
         <PaystubThumbnail template={template} data={data} framed={false} />
+        <DirectDepositSlip data={data} />
       </div>
     </div>
   );

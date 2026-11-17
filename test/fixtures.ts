@@ -9,6 +9,7 @@ export const paystubForm = () => ({
   employeeCity: "Austin",
   employeeState: "TX",
   employeeZip: "78702",
+  exemptions: "0",
   payPeriodStart: "2026-10-01",
   payPeriodEnd: "2026-10-15",
   payDate: "2026-10-16",

@@ -14,7 +14,12 @@ import { actorOf, type AuditService } from "../audit/index.ts";
 import type { NotificationsService } from "../notifications/notifications.service.ts";
 import { env } from "../../config/env.ts";
 import { logger } from "../../shared/logger.ts";
-import { validateFormData, type DisplayFields } from "./form-data.ts";
+import {
+  PAYSTUB_SCHEMA_VERSION,
+  paystubFieldsForRender,
+  validateFormData,
+  type DisplayFields,
+} from "./form-data.ts";
 import { buildDocumentStorageKey } from "./storage-key.ts";
 import type { DocumentListFilter, DocumentRepository, DocumentWithOrder } from "./repositories/document.repository.ts";
 
@@ -90,6 +95,7 @@ export class DocumentsService {
         ...prepared.display,
         formDataEnc: prepared.formDataEnc,
         formDataKeyId: prepared.formDataKeyId,
+        schemaVersion: prepared.type === "paystub" ? PAYSTUB_SCHEMA_VERSION : 1,
         status: input.status,
       },
       tx,
@@ -190,7 +196,9 @@ export class DocumentsService {
     if (!doc) return;
     try {
       if (!doc.formDataEnc || !doc.formDataKeyId) throw new Error("Form data is not available");
-      const formData = decryptJson(doc.formDataEnc, doc.formDataKeyId);
+      const stored = decryptJson(doc.formDataEnc, doc.formDataKeyId);
+      // Paystub: normalize v1/v2 → flat render fields (builders + optional DD slip).
+      const formData = doc.type === "paystub" ? paystubFieldsForRender(stored) : stored;
       const pdf = await this.d.renderer.render({ type: doc.type, template: doc.template, formData });
       const sequence = await this.d.documents.ownerMonthSequence({
         documentId: doc.id,

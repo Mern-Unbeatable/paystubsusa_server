@@ -1,4 +1,5 @@
 import { formatCurrency } from "../utils/formatCurrency";
+import { amountToCheckWords } from "../utils/numberToWords";
 import { formatDate } from "./buildPaystubDocument";
 import { toLogoSrc } from "../utils/readLogoFile";
 
@@ -65,5 +66,21 @@ export const buildThumbnailData = (formData, calculations) => {
       deductions: formatCurrency(calculations.allDeductions),
       net: formatCurrency(calculations.netPay),
     },
+    period: {
+      payDate: formatDate(formData.payDate),
+    },
+    directDeposit: formData.directDeposit?.enabled
+      ? {
+          enabled: true,
+          bankName: formData.directDeposit.bankName || "",
+          accountHolderName: formData.directDeposit.accountHolderName || "",
+          accountNumber: formData.directDeposit.accountNumber || "",
+          routingNumber: formData.directDeposit.routingNumber || "",
+          checkNumber: formData.directDeposit.checkNumber || "",
+          netPay: calculations.netPay,
+          netPayText: formatCurrency(calculations.netPay),
+          netWords: amountToCheckWords(calculations.netPay),
+        }
+      : { enabled: false },
   };
 };

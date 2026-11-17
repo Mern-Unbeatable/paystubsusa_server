@@ -95,7 +95,12 @@ export const buildPaystubDocument = (formData, calculations) => {
       };
     });
 
-  const checkNumber = stableDigits(`${seed}|check`, 6);
+  const dd = formData.directDeposit ?? {};
+  const ddEnabled = Boolean(dd.enabled);
+  const checkNumber =
+    (ddEnabled && String(dd.checkNumber || "").trim()) ||
+    stableDigits(`${seed}|check`, 6);
+  const ssnLast4 = String(formData.ssnLast4 || "").replace(/\D/g, "").slice(-4);
 
   return {
     company: {
@@ -108,10 +113,13 @@ export const buildPaystubDocument = (formData, calculations) => {
     },
     employee: {
       name: formData.employeeName,
+      phone: formData.employeePhone || "",
       address: formData.employeeAddress,
       cityLine: joinCityLine(formData.employeeCity, formData.employeeState, formData.employeeZip),
       id: formData.employeeId,
-      ssnMasked: "XXX-XX-XXXX",
+      ssnMasked: ssnLast4 ? `XXX-XX-${ssnLast4}` : "XXX-XX-XXXX",
+      exemptions: formData.exemptions || "",
+      maritalStatus: formData.maritalStatus || "",
     },
     period: {
       start: formatDate(formData.payPeriodStart),
@@ -150,6 +158,20 @@ export const buildPaystubDocument = (formData, calculations) => {
       clock: stableDigits(`${seed}|clock`, 5),
       voucher: checkNumber.slice(-5),
     },
-    distributionType: "Check",
+    distributionType: ddEnabled ? "Direct Deposit" : "Check",
+    directDeposit: ddEnabled
+      ? {
+          enabled: true,
+          bankName: dd.bankName || "",
+          accountHolderName: dd.accountHolderName || "",
+          accountNumber: dd.accountNumber || "",
+          routingNumber: dd.routingNumber || "",
+          checkNumber,
+          /** Always from calculated net pay — never a client-entered deposit amount. */
+          netPay: calculations.netPay,
+          netPayText: money(calculations.netPay),
+          netWords: amountToCheckWords(calculations.netPay),
+        }
+      : { enabled: false },
   };
 };

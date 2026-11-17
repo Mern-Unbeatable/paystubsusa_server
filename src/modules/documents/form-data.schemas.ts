@@ -54,24 +54,42 @@ const logo = z
   .optional()
   .default("");
 
-export const paystubFormData = z
+const paystubEmployer = z.object({
+  companyLogo: logo,
+  companyName: required("Company name"),
+  companyAddress: required("Company address"),
+  companyCity: required("Company city", 100),
+  companyState: state("Company state"),
+  companyZip: zip("Company ZIP"),
+  companyEin: optionalEin,
+  companyPhone: optional(30),
+});
+
+const paystubEmployee = z.object({
+  employeeName: required("Employee name"),
+  employeePhone: optional(30),
+  employeeAddress: required("Employee address"),
+  employeeCity: required("Employee city", 100),
+  employeeState: state("Employee state"),
+  employeeZip: zip("Employee ZIP"),
+  employeeId: optional(50),
+  ssnLast4: z
+    .string()
+    .trim()
+    .refine((v) => v === "" || /^\d{4}$/.test(v), "SSN last 4 must be 4 digits")
+    .optional()
+    .default(""),
+  exemptions: z.enum(["0", "1", "2", "3", "4", "5", "6", "7", "8"], {
+    error: "Exemptions must be a number from 0 to 8",
+  }),
+  maritalStatus: z
+    .enum(["", "Single", "Married", "Head of Household"])
+    .optional()
+    .default(""),
+});
+
+const paystubPayDetails = z
   .object({
-    companyLogo: logo,
-    companyName: required("Company name"),
-    companyAddress: required("Company address"),
-    companyCity: required("Company city", 100),
-    companyState: state("Company state"),
-    companyZip: zip("Company ZIP"),
-    companyEin: optionalEin,
-    companyPhone: optional(30),
-
-    employeeName: required("Employee name"),
-    employeeAddress: required("Employee address"),
-    employeeCity: required("Employee city", 100),
-    employeeState: state("Employee state"),
-    employeeZip: zip("Employee ZIP"),
-    employeeId: optional(50),
-
     payPeriodStart: isoDate("Pay period start"),
     payPeriodEnd: isoDate("Pay period end"),
     payDate: isoDate("Pay date"),
@@ -81,22 +99,112 @@ export const paystubFormData = z
     regularHours: z.union([z.literal(""), hours("Regular hours")]).optional().default(""),
     overtimeHours: z.union([z.literal(""), hours("Overtime hours")]).optional().default(""),
     salaryAmount: z.union([z.literal(""), money("Salary amount")]).optional().default(""),
-
     additionalEarnings: z.array(descLine).max(20).default([]),
     taxes: z.array(labelLine).max(20).default([]),
     deductions: z.array(descLine).max(20).default([]),
   })
   .superRefine((d, ctx) => {
     if (d.payPeriodEnd < d.payPeriodStart) {
-      ctx.addIssue({ code: "custom", path: ["payPeriodEnd"], message: "Pay period end must be on or after the start" });
+      ctx.addIssue({
+        code: "custom",
+        path: ["payPeriodEnd"],
+        message: "Pay period end must be on or after the start",
+      });
     }
     if (d.payType === "Hourly") {
       if (!d.hourlyRate) ctx.addIssue({ code: "custom", path: ["hourlyRate"], message: "Hourly rate is required" });
-      if (!d.regularHours) ctx.addIssue({ code: "custom", path: ["regularHours"], message: "Regular hours are required" });
+      if (!d.regularHours) {
+        ctx.addIssue({ code: "custom", path: ["regularHours"], message: "Regular hours are required" });
+      }
     } else if (!d.salaryAmount) {
       ctx.addIssue({ code: "custom", path: ["salaryAmount"], message: "Salary amount is required" });
     }
   });
+
+const routingNumber = z
+  .string()
+  .trim()
+  .transform((v) => v.replace(/[\s-]/g, ""))
+  .pipe(z.string().regex(/^\d{9}$/, "Routing number must be 9 digits"));
+
+const bankAccountNumber = z
+  .string()
+  .trim()
+  .transform((v) => v.replace(/[\s-]/g, ""))
+  .pipe(z.string().regex(/^\d{4,17}$/, "Account number must be 4–17 digits"));
+
+const paystubDirectDeposit = z
+  .object({
+    enabled: z.boolean().default(false),
+    bankName: optional(100),
+    accountHolderName: optional(100),
+    accountNumber: z.string().trim().optional().default(""),
+    routingNumber: z.string().trim().optional().default(""),
+    checkNumber: optional(32),
+  })
+  .superRefine((d, ctx) => {
+    if (!d.enabled) return;
+    if (!d.bankName?.trim()) {
+      ctx.addIssue({ code: "custom", path: ["bankName"], message: "Bank name is required" });
+    }
+    if (!d.accountHolderName?.trim()) {
+      ctx.addIssue({ code: "custom", path: ["accountHolderName"], message: "Account holder name is required" });
+    }
+    const acct = bankAccountNumber.safeParse(d.accountNumber);
+    if (!acct.success) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["accountNumber"],
+        message: acct.error.issues[0]?.message ?? "Account number is required",
+      });
+    }
+    const routing = routingNumber.safeParse(d.routingNumber);
+    if (!routing.success) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["routingNumber"],
+        message: routing.error.issues[0]?.message ?? "Routing number is required",
+      });
+    }
+  })
+  .transform((d) => {
+    if (!d.enabled) {
+      return {
+        enabled: false,
+        bankName: "",
+        accountHolderName: "",
+        accountNumber: "",
+        routingNumber: "",
+        checkNumber: d.checkNumber ?? "",
+      };
+    }
+    return {
+      enabled: true,
+      bankName: d.bankName ?? "",
+      accountHolderName: d.accountHolderName ?? "",
+      accountNumber: bankAccountNumber.parse(d.accountNumber),
+      routingNumber: routingNumber.parse(d.routingNumber),
+      checkNumber: d.checkNumber ?? "",
+    };
+  });
+
+/** Step-based paystub payload (schemaVersion 2). Legacy flat input is normalized first. */
+export const paystubFormData = z.object({
+  schemaVersion: z.literal(2).default(2),
+  steps: z.object({
+    employer: paystubEmployer,
+    employee: paystubEmployee,
+    payDetails: paystubPayDetails,
+    directDeposit: paystubDirectDeposit.default({
+      enabled: false,
+      bankName: "",
+      accountHolderName: "",
+      accountNumber: "",
+      routingNumber: "",
+      checkNumber: "",
+    }),
+  }),
+});
 
 export const w2FormData = z.object({
   taxYear,

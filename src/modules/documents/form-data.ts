@@ -10,9 +10,36 @@ import {
   type W2FormData,
 } from "./form-data.schemas.ts";
 import { normalizeLogo } from "./logo.ts";
+import {
+  flattenPaystubSteps,
+  normalizePaystubFormData,
+  PAYSTUB_SCHEMA_VERSION,
+  type PaystubFormDataV2,
+  type PaystubPayDetails,
+  type PaystubRenderFields,
+} from "./paystub-form.ts";
+
+export type { PaystubFormDataV2, PaystubRenderFields } from "./paystub-form.ts";
+export {
+  flattenPaystubSteps,
+  normalizePaystubFormData,
+  PAYSTUB_SCHEMA_VERSION,
+} from "./paystub-form.ts";
 
 /** Port of calculatePaystub in web/src/pages/public/Generator/hooks/usePaystubFormData.js. */
-export function calculatePaystub(d: Pick<PaystubFormData, "payType" | "hourlyRate" | "regularHours" | "overtimeHours" | "salaryAmount" | "additionalEarnings" | "taxes" | "deductions">) {
+export function calculatePaystub(
+  d: Pick<
+    PaystubPayDetails | PaystubRenderFields,
+    | "payType"
+    | "hourlyRate"
+    | "regularHours"
+    | "overtimeHours"
+    | "salaryAmount"
+    | "additionalEarnings"
+    | "taxes"
+    | "deductions"
+  >,
+) {
   const sum = (items: { amount: string }[]) => items.reduce((s, i) => s + parseMoney(i.amount), 0);
   let regularEarnings: number;
   let overtimeEarnings = 0;
@@ -32,7 +59,15 @@ export function calculatePaystub(d: Pick<PaystubFormData, "payType" | "hourlyRat
   const totalTaxes = sum(d.taxes);
   const totalDeductions = sum(d.deductions);
   const allDeductions = totalTaxes + totalDeductions;
-  return { regularEarnings, overtimeEarnings, totalGross, totalTaxes, totalDeductions, allDeductions, netPay: Math.max(0, totalGross - allDeductions) };
+  return {
+    regularEarnings,
+    overtimeEarnings,
+    totalGross,
+    totalTaxes,
+    totalDeductions,
+    allDeductions,
+    netPay: Math.max(0, totalGross - allDeductions),
+  };
 }
 
 /** Same rule as toFileSafe in web/src/pages/public/shared/documentFlow/utils/documentFlow.js. */
@@ -53,16 +88,23 @@ export interface DisplayFields {
   fileName: string;
 }
 
+function asPaystubV2(data: unknown): PaystubFormDataV2 {
+  return data as PaystubFormDataV2;
+}
+
 export function displayFields(type: DocumentType, data: unknown): DisplayFields {
   switch (type) {
     case "paystub": {
-      const d = data as PaystubFormData;
+      const d = asPaystubV2(data);
+      const pay = d.steps.payDetails;
+      const employee = d.steps.employee;
+      const employer = d.steps.employer;
       return {
-        title: `Paystub · ${d.payDate}`,
-        employerName: d.companyName,
-        recipientName: d.employeeName,
-        amountCents: cents(calculatePaystub(d).netPay),
-        fileName: fileName(["Paystub", d.employeeName, d.payDate]),
+        title: `Paystub · ${pay.payDate}`,
+        employerName: employer.companyName,
+        recipientName: employee.employeeName,
+        amountCents: cents(calculatePaystub(pay).netPay),
+        fileName: fileName(["Paystub", employee.employeeName, pay.payDate]),
       };
     }
     case "w2": {
@@ -101,14 +143,39 @@ export function displayFields(type: DocumentType, data: unknown): DisplayFields 
 
 /** Validates untrusted formData for the type (422 on failure) and re-encodes the logo. */
 export async function validateFormData(type: DocumentType, input: unknown) {
-  const result = formDataSchemas[type].safeParse(input);
+  const parsedInput = type === "paystub" ? normalizePaystubFormData(input) : input;
+  const result = formDataSchemas[type].safeParse(parsedInput);
   if (!result.success) {
     const errors = zodToFieldErrors(result.error);
     throw validation(Object.fromEntries(Object.entries(errors).map(([k, v]) => [`formData.${k}`, v])));
   }
   const data = result.data as Record<string, unknown>;
-  if (type === "paystub" && typeof data["companyLogo"] === "string" && data["companyLogo"]) {
-    data["companyLogo"] = await normalizeLogo(data["companyLogo"]);
+  if (type === "paystub") {
+    const stub = data as unknown as PaystubFormData;
+    const logoValue = stub.steps.employer.companyLogo;
+    if (logoValue) {
+      stub.steps.employer.companyLogo = await normalizeLogo(logoValue);
+    }
+    return { data: stub, display: displayFields(type, stub) };
   }
   return { data, display: displayFields(type, data) };
+}
+
+/** Decrypt → normalize → flatten for Playwright / PDF builders. */
+export function paystubFieldsForRender(stored: unknown): PaystubRenderFields {
+  const normalized = normalizePaystubFormData(stored);
+  const parsed = formDataSchemas.paystub.safeParse(normalized);
+  if (!parsed.success) {
+    // Last-resort flatten if already v2-shaped but partially invalid at regenerate time.
+    if (
+      typeof normalized === "object" &&
+      normalized &&
+      "steps" in normalized &&
+      (normalized as PaystubFormDataV2).steps
+    ) {
+      return flattenPaystubSteps((normalized as PaystubFormDataV2).steps);
+    }
+    throw new Error("Stored paystub form data is invalid");
+  }
+  return flattenPaystubSteps(parsed.data.steps);
 }

@@ -80,6 +80,7 @@ export interface NewDocument {
   fileName: string;
   formDataEnc: Uint8Array<ArrayBuffer>;
   formDataKeyId: string;
+  schemaVersion?: number;
   status: "awaiting_payment" | "queued";
 }
 
