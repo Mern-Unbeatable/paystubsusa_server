@@ -22,7 +22,7 @@ export const buildThumbnailData = (formData, calculations) => {
     if (toNumber(formData.overtimeHours) > 0) {
       earnings.push({
         desc: "Overtime",
-        rate: `${toNumber(formData.overtimeHours)}h × 1.5`,
+        rate: `${toNumber(formData.overtimeHours)}h × ${formatCurrency(toNumber(formData.hourlyRate) * 1.5)}`,
         amount: formatCurrency(calculations.overtimeEarnings),
       });
     }
@@ -61,6 +61,11 @@ export const buildThumbnailData = (formData, calculations) => {
     grossPay: formatCurrency(calculations.totalGross),
     taxes: formData.taxes.map((t) => ({ desc: t.label, amount: formatCurrency(toNumber(t.amount)) })),
     totalTaxes: formatCurrency(calculations.totalTaxes),
+    deductions: (formData.deductions ?? []).map((d) => ({
+      desc: d.desc,
+      amount: formatCurrency(toNumber(d.amount)),
+    })),
+    totalDeductions: formatCurrency(calculations.totalDeductions),
     summary: {
       gross: formatCurrency(calculations.totalGross),
       deductions: formatCurrency(calculations.allDeductions),

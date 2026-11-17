@@ -346,7 +346,7 @@ export const PaystubThumbnail = ({ template, full = false, data = STUB_DATA, fra
           </div>
         </div>
 
-        {/* Taxes Table */}
+        {/* Taxes + other deductions */}
         <div>
           <div
             className={`px-1.5 py-0.5 rounded-t-(--ps-radius) text-[calc(6.5px*var(--ps-fs))] font-bold flex justify-between ${
@@ -373,18 +373,42 @@ export const PaystubThumbnail = ({ template, full = false, data = STUB_DATA, fra
               <span>Total Taxes</span>
               <span>{stub.totalTaxes}</span>
             </div>
+            {(stub.deductions?.length ?? 0) > 0 && (
+              <>
+                <div className="pt-1 mt-0.5 border-t border-(--ps-b100)">
+                  <p className="text-(--ps-s400) text-[calc(5.5px*var(--ps-fs))] uppercase font-semibold mb-0.5">
+                    Other deductions
+                  </p>
+                  {stub.deductions.map((d, idx) => (
+                    <div
+                      key={idx}
+                      className="flex justify-between text-(--ps-s600)"
+                    >
+                      <span className="truncate">{d.desc}</span>
+                      <span className="font-medium text-(--ps-s700)">
+                        {d.amount}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-between font-bold text-(--ps-s900) border-t border-(--ps-b100) pt-0.5 mt-0.5">
+                  <span>Total Deductions</span>
+                  <span>{stub.summary.deductions}</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
 
-      {/* 4. Other Deductions & Bottom Summary */}
+      {/* 4. Bottom Summary */}
       <div className="border-t border-slate-150 pt-1 text-[calc(6.5px*var(--ps-fs))] flex justify-between text-(--ps-s500) font-medium">
         <span>
           Gross Pay:{" "}
           <strong className="text-(--ps-s800)">{stub.summary.gross}</strong>
         </span>
         <span>
-          Deductions:{" "}
+          Taxes &amp; Deductions:{" "}
           <strong className="text-(--ps-s800)">
             {stub.summary.deductions}
           </strong>

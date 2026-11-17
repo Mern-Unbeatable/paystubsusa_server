@@ -23,6 +23,7 @@ const PaystubPrintDocument = ({ template, formData, calculations }) => {
     [hasDocument, formData, calculations],
   );
 
+  // DD slip stays inside the zoom block so its type matches the stub above.
   return hasDocument ? (
     <TemplateDocument template={template} data={data} />
   ) : (
@@ -30,11 +31,12 @@ const PaystubPrintDocument = ({ template, formData, calculations }) => {
       <div
         style={{
           width: VARIANT_TEMPLATE_WIDTH,
-          zoom: (DOCUMENT_PAGE.width - PRINT_MARGIN * 2) / VARIANT_TEMPLATE_WIDTH,
+          zoom:
+            (DOCUMENT_PAGE.width - PRINT_MARGIN * 2) / VARIANT_TEMPLATE_WIDTH,
         }}
       >
         <PaystubThumbnail template={template} data={data} framed={false} />
-        <DirectDepositSlip data={data} />
+        <DirectDepositSlip data={data} compact />
       </div>
     </div>
   );
