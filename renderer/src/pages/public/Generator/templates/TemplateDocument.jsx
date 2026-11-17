@@ -16,13 +16,15 @@ const TemplateDocument = ({ template, data }) => {
       body = null;
   }
 
-  // Template 09 already has a voided advice check — do not append a second deposit stub.
-  const hasBuiltInAdvice = template?.document === "earnings-statement";
+  // 09 embeds DD (or voided check) in-body; 10 has its own check face — never append a second stub.
+  const skipAppendedDd =
+    template?.document === "earnings-statement" ||
+    template?.document === "check-statement";
 
   return (
     <div>
       {body}
-      {!hasBuiltInAdvice && <DirectDepositSlip data={data} />}
+      {!skipAppendedDd && <DirectDepositSlip data={data} />}
     </div>
   );
 };
