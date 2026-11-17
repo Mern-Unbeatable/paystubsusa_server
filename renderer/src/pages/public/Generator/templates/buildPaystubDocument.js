@@ -120,6 +120,7 @@ export const buildPaystubDocument = (formData, calculations) => {
       ssnMasked: ssnLast4 ? `XXX-XX-${ssnLast4}` : "XXX-XX-XXXX",
       exemptions: formData.exemptions || "",
       maritalStatus: formData.maritalStatus || "",
+      employmentType: formData.employmentType || "Employee",
     },
     period: {
       start: formatDate(formData.payPeriodStart),

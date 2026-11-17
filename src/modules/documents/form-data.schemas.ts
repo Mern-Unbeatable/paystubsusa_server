@@ -86,6 +86,7 @@ const paystubEmployee = z.object({
     .enum(["", "Single", "Married", "Head of Household"])
     .optional()
     .default(""),
+  employmentType: z.enum(["Employee", "Contractor"]).default("Employee"),
 });
 
 const paystubPayDetails = z

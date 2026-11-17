@@ -193,8 +193,11 @@ export function usePaystubFormData() {
         ...pay,
         taxes: pay.taxes.map((t) => (t.id === id ? { ...t, amount } : t)),
       })),
-    handleAddEarning: () =>
-      addRow("additionalEarnings", { desc: "Bonus / Commission", amount: "0.00" }),
+    handleAddEarning: (desc = "Custom") =>
+      addRow("additionalEarnings", {
+        desc: desc === "Custom" ? "" : desc,
+        amount: "0.00",
+      }),
     handleRemoveEarning: (id) => removeRow("additionalEarnings", id),
     handleAddDeduction: () =>
       addRow("deductions", { desc: "401(k) / Insurance", amount: "0.00" }),

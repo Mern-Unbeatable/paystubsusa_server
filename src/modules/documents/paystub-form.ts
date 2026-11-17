@@ -27,6 +27,7 @@ export type PaystubEmployee = {
   ssnLast4: string;
   exemptions: string;
   maritalStatus: string;
+  employmentType: string;
 };
 
 export type PaystubPayDetails = {
@@ -139,6 +140,7 @@ export function normalizePaystubFormData(input: unknown): unknown {
       ssnLast4,
       exemptions,
       maritalStatus,
+      employmentType,
       payPeriodStart,
       payPeriodEnd,
       payDate,
@@ -179,6 +181,7 @@ export function normalizePaystubFormData(input: unknown): unknown {
           ssnLast4,
           exemptions,
           maritalStatus,
+          employmentType,
         },
         payDetails: {
           payPeriodStart,

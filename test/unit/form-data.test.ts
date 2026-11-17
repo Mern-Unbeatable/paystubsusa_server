@@ -66,6 +66,7 @@ describe("validateFormData", () => {
           ssnLast4: "",
           exemptions: "0",
           maritalStatus: "",
+          employmentType: "Employee",
         },
         payDetails: {
           payPeriodStart: "2026-10-01",
