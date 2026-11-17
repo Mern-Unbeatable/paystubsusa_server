@@ -249,16 +249,30 @@ const EarningsStatementTemplate = ({ data }) => {
         style={at(57, 753, {
           width: 701,
           height: 2,
-          backgroundImage: "repeating-linear-gradient(90deg, #333333 0 12px, transparent 12px 20px)",
+          backgroundImage:
+            "repeating-linear-gradient(90deg, #333333 0 12px, transparent 12px 20px)",
         })}
       />
 
-      {/* Voided check */}
-      <div style={at(company.logo ? 64 : 80, 796, { display: "flex", alignItems: "center", gap: 8 })}>
+      {/* Voided check / advice stub */}
+      <div
+        style={at(company.logo ? 64 : 80, 796, {
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+        })}
+      >
         {company.logo && (
           <>
-            <CompanyLogo src={company.logo} boxWidth={100} boxHeight={60} shrink />
-            <div style={{ alignSelf: "stretch", width: 1, background: "#9a9a9a" }} />
+            <CompanyLogo
+              src={company.logo}
+              boxWidth={100}
+              boxHeight={60}
+              shrink
+            />
+            <div
+              style={{ alignSelf: "stretch", width: 1, background: "#9a9a9a" }}
+            />
           </>
         )}
         <div style={{ fontSize: 11.5, lineHeight: "15.5px", whiteSpace: "nowrap" }}>
@@ -275,7 +289,9 @@ const EarningsStatementTemplate = ({ data }) => {
           ["Social Security Number:", employee.ssnMasked],
         ].map(([label, value, bold]) => (
           <div key={label} style={{ display: "flex" }}>
-            <span style={{ width: 159, fontWeight: bold ? 700 : 400 }}>{label}</span>
+            <span style={{ width: 159, fontWeight: bold ? 700 : 400 }}>
+              {label}
+            </span>
             <span>{value}</span>
           </div>
         ))}
@@ -285,7 +301,14 @@ const EarningsStatementTemplate = ({ data }) => {
         <div>Pay to the</div>
         <div>order of:</div>
       </div>
-      <div style={at(247, 877, { fontSize: 15, fontWeight: 700, maxWidth: 480, whiteSpace: "nowrap" })}>
+      <div
+        style={at(247, 877, {
+          fontSize: 15,
+          fontWeight: 700,
+          maxWidth: 480,
+          whiteSpace: "nowrap",
+        })}
+      >
         {employee.name}
       </div>
       <div style={at(176, 897, { width: 563, borderTop: RULE })} />
@@ -302,12 +325,24 @@ const EarningsStatementTemplate = ({ data }) => {
           lineHeight: "19px",
         })}
       >
-        <span style={at(6, 0, { width: 390, whiteSpace: "nowrap", overflow: "hidden" })}>{totals.netWords}</span>
+        <span
+          style={at(6, 0, {
+            width: 390,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+          })}
+        >
+          {totals.netWords}
+        </span>
         <div style={at(398, -1, { height: 21, borderLeft: RULE })} />
-        <span style={at(400, 0, { width: 88, textAlign: "right" })}>{totals.net}</span>
+        <span style={at(400, 0, { width: 88, textAlign: "right" })}>
+          {totals.net}
+        </span>
       </div>
 
-      <div style={at(544, 931, { fontSize: 16, fontWeight: 700 })}>NON-NEGOTIABLE</div>
+      <div style={at(544, 931, { fontSize: 16, fontWeight: 700 })}>
+        NON-NEGOTIABLE
+      </div>
       <div style={at(544, 951, { fontSize: 14 })}>VOIDED CHECK</div>
     </div>
   );

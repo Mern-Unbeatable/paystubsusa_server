@@ -37,8 +37,8 @@ const SIZES = {
     amount: 7,
     logoW: 28,
     logoH: 22,
-    marginTop: 10,
-    cutGap: 6,
+    marginTop: 16,
+    cutGap: 12,
     scissors: 10,
     pad: "6px 8px",
   },
@@ -49,8 +49,8 @@ const SIZES = {
     amount: 11.5,
     logoW: 48,
     logoH: 36,
-    marginTop: 22,
-    cutGap: 10,
+    marginTop: 28,
+    cutGap: 16,
     scissors: 14,
     pad: "10px 12px",
   },
@@ -89,10 +89,7 @@ const DirectDepositSlip = ({ data, compact = false }) => {
   const s = compact ? SIZES.compact : SIZES.document;
   const company = data.company ?? {};
   const employeeName =
-    dd.accountHolderName ||
-    data.employee?.name ||
-    data.employeeName ||
-    "—";
+    dd.accountHolderName || data.employee?.name || data.employeeName || "—";
   const payDate =
     data.period?.payDate ||
     String(data.statement?.payDate || "").replace(/^Pay Date:\s*/i, "") ||
@@ -148,7 +145,6 @@ const DirectDepositSlip = ({ data, compact = false }) => {
 
       <div
         style={{
-          border: "1px solid #94a3b8",
           padding: s.pad,
           background: "transparent",
         }}
@@ -214,65 +210,62 @@ const DirectDepositSlip = ({ data, compact = false }) => {
           </div>
         </div>
 
+        {/* Header row → rule → values (rule sits flush under headers). */}
         <div
           style={{
-            borderTop: "1px solid #94a3b8",
-            paddingTop: compact ? 5 : 8,
             display: "grid",
             gridTemplateColumns: "1.6fr 1.1fr 0.7fr 0.55fr 1fr",
-            gap: compact ? 6 : 10,
-            alignItems: "start",
+            columnGap: compact ? 6 : 10,
+            alignItems: "end",
+            borderBottom: "1px solid #334155",
+            paddingBottom: 1,
           }}
         >
-          <div>
-            <div style={colLabel}>Deposited to the account of</div>
-            <div style={colValue}>{employeeName}</div>
-            <div
-              style={{
-                ...colValue,
-                fontWeight: 700,
-                fontSize: s.label,
-                marginTop: compact ? 4 : 6,
-                letterSpacing: "0.02em",
-              }}
-            >
-              NON-NEGOTIABLE
-            </div>
+          <div style={{ ...colLabel, marginBottom: 0 }}>
+            Deposited to the account of
           </div>
-          <div>
-            <div style={colLabel}>Account Number</div>
-            <div style={colValue}>{maskedAccount}</div>
-          </div>
-          <div>
-            <div style={colLabel}>Transit</div>
-            <div style={colValue}>{transitFromRouting(dd.routingNumber)}</div>
-          </div>
-          <div>
-            <div style={colLabel}>ABA</div>
-            <div style={colValue}>{abaFromRouting(dd.routingNumber)}</div>
-          </div>
+          <div style={{ ...colLabel, marginBottom: 0 }}>Account Number</div>
+          <div style={{ ...colLabel, marginBottom: 0 }}>Transit</div>
+          <div style={{ ...colLabel, marginBottom: 0 }}>ABA</div>
+          <div style={{ ...colLabel, marginBottom: 0 }}>Amount</div>
+        </div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1.6fr 1.1fr 0.7fr 0.55fr 1fr",
+            columnGap: compact ? 6 : 10,
+            alignItems: "start",
+            paddingTop: compact ? 2 : 3,
+          }}
+        >
+          <div style={colValue}>{employeeName}</div>
+          <div style={colValue}>{maskedAccount}</div>
+          <div style={colValue}>{transitFromRouting(dd.routingNumber)}</div>
+          <div style={colValue}>{abaFromRouting(dd.routingNumber)}</div>
           <div
             style={{
-              borderLeft: "1px solid #94a3b8",
-              paddingLeft: compact ? 6 : 10,
-              minHeight: "100%",
+              ...colValue,
+              display: "inline-block",
+              fontWeight: 700,
+              fontSize: s.amount,
+              border: "1px solid #CCCCCC",
+              padding: compact ? "1px 5px" : "2px 8px",
+              lineHeight: 1.3,
             }}
           >
-            <div style={colLabel}>Amount</div>
-            <div
-              style={{
-                display: "inline-block",
-                border: "1px solid #94a3b8",
-                padding: compact ? "1px 5px" : "2px 8px",
-                fontWeight: 700,
-                fontSize: s.amount,
-                lineHeight: 1.3,
-                marginTop: 1,
-              }}
-            >
-              {amountText}
-            </div>
+            {amountText}
           </div>
+        </div>
+        <div
+          style={{
+            marginTop: compact ? 8 : 12,
+            textAlign: "right",
+            fontWeight: 700,
+            fontSize: s.label,
+            letterSpacing: "0.02em",
+          }}
+        >
+          NON-NEGOTIABLE
         </div>
       </div>
     </div>
