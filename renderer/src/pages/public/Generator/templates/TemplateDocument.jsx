@@ -16,7 +16,7 @@ const TemplateDocument = ({ template, data }) => {
       body = null;
   }
 
-  // 09/10 embed DD in-body (replacing the voided check) — never append a second stub.
+  // 09/10 embed DD in-body — never append a second stub.
   const skipAppendedDd =
     template?.document === "earnings-statement" ||
     template?.document === "check-statement";
