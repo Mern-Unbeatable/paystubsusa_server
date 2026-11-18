@@ -15,7 +15,6 @@ import {
 } from "../catalog/index.ts";
 import {
   applyPaystubDdSlipEntitlement,
-  normalizePaystubFormData,
   type DocumentsService,
 } from "../documents/index.ts";
 import type { NotificationsService } from "../notifications/index.ts";
@@ -89,8 +88,9 @@ export class OrdersService implements GuestOrderLinker {
       input.documentType,
     );
     // Template 10 (check-statement) never renders a DD slip — reject the add-on.
+    // Purchase intent is only the cart line (`paystub_dd_slip`), never stale form `enabled`.
     const ddSlipUnsupported = template.renderer === "check-statement";
-    let items = input.items.map((i) => ({ ...i }));
+    const items = input.items.map((i) => ({ ...i }));
     if (
       ddSlipUnsupported &&
       items.some((i) => i.productCode === PAYSTUB_DD_SLIP_PRODUCT_CODE)
@@ -98,31 +98,6 @@ export class OrdersService implements GuestOrderLinker {
       throw validation({
         items: ["Direct Deposit Slip is not available for this template"],
       });
-    }
-
-    // If the form has the slip enabled but the client omitted the add-on line, attach it
-    // so preview/PDF entitlement matches what the customer filled in (and they are charged).
-    const isSubscriptionOnly =
-      items.length === 1 && items[0]?.productCode === UNLIMITED_PRODUCT_CODE;
-    if (
-      input.documentType === "paystub" &&
-      !ddSlipUnsupported &&
-      !isSubscriptionOnly &&
-      !items.some((i) => i.productCode === PAYSTUB_DD_SLIP_PRODUCT_CODE)
-    ) {
-      const normalized = normalizePaystubFormData(input.formData);
-      const dd =
-        typeof normalized === "object" &&
-        normalized &&
-        "steps" in normalized &&
-        typeof (normalized as { steps?: { directDeposit?: { enabled?: boolean } } }).steps
-          ?.directDeposit === "object"
-          ? (normalized as { steps: { directDeposit: { enabled?: boolean } } }).steps
-              .directDeposit
-          : null;
-      if (dd?.enabled) {
-        items = [...items, { productCode: PAYSTUB_DD_SLIP_PRODUCT_CODE, quantity: 1 }];
-      }
     }
 
     const quote = await this.d.catalog.quote(items);
