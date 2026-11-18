@@ -1,4 +1,6 @@
 import CompanyLogo from "./CompanyLogo";
+import DirectDepositSlip from "./DirectDepositSlip";
+import { shouldRenderDirectDepositSlip } from "./shouldRenderDirectDepositSlip";
 
 const PAGE_WIDTH = 816;
 const PAGE_HEIGHT = 1056;
@@ -255,6 +257,8 @@ const CheckStatementTemplate = ({ data }) => {
     totals,
     reference,
   } = data;
+  // Paid DD slip replaces the voided check face (one stub only).
+  const showDdSlip = shouldRenderDirectDepositSlip(data.directDeposit);
   const toRows = (items) =>
     items.map((item) => ({
       label: item.label,
@@ -280,13 +284,20 @@ const CheckStatementTemplate = ({ data }) => {
         overflow: "hidden",
       }}
     >
-      {/* Check */}
+      {showDdSlip ? (
+        <div style={at(20, 16, { width: 776 })}>
+          <DirectDepositSlip data={data} embedded />
+        </div>
+      ) : null}
+
+      {/* Check — hidden when a paid DD slip is shown instead */}
       <div
         style={at(20, 16, {
           width: 776,
           borderRadius: 8,
           overflow: "hidden",
           border: "1px solid #c9cbb8",
+          display: showDdSlip ? "none" : undefined,
         })}
       >
         <div
