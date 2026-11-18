@@ -21,6 +21,7 @@ export const DEFAULT_STEPS = {
     companyZip: "50309",
     companyEin: "12-3456789",
     companyPhone: "",
+    checkSigner: "John Smith",
   },
   employee: {
     employeeName: "Jane Doe",

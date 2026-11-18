@@ -118,6 +118,7 @@ export const buildPaystubDocument = (formData, calculations) => {
       cityLine: joinCityLine(formData.companyCity, formData.companyState, formData.companyZip),
       ein: formData.companyEin,
       phone: formData.companyPhone || "",
+      checkSigner: formData.checkSigner || "",
     },
     employee: {
       name: formData.employeeName,

@@ -4,6 +4,7 @@ export const paystubForm = () => ({
   companyCity: "Austin",
   companyState: "TX",
   companyZip: "78701",
+  checkSigner: "John Smith",
   employeeName: "Jane Doe",
   employeeAddress: "2 Oak Ave",
   employeeCity: "Austin",

@@ -55,6 +55,7 @@ describe("validateFormData", () => {
           companyZip: "78701",
           companyEin: "",
           companyPhone: "",
+          checkSigner: "John Smith",
         },
         employee: {
           employeeName: "Jane Doe",

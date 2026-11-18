@@ -8,7 +8,7 @@ const EARNINGS_HEADER = "#dde6f2";
 const TOTAL_ROW = "#eef0fb";
 const STRIPE_GRAY = "#dedede";
 const CELL_BORDER = "1px solid #d3dae4";
-const CHECK_BANNER = "#5f8f6c";
+const CHECK_BANNER = "#6a9a76";
 const CHECK_FACE = "#f1eed8";
 const ROW_HEIGHT = 24;
 
@@ -33,25 +33,36 @@ const wavePath = (y0, amp, freq, phase, width = 776) => {
 
 const CheckPattern = () => {
   const waves = [];
-  for (let i = 0; i < 72; i += 1) {
+  // Packed horizontal waves (~1.15px spacing across the face).
+  for (let i = 0; i < 240; i += 1) {
     waves.push({
       key: `w${i}`,
-      d: wavePath(2 + i * 3.8, 7 + (i % 6), 6 + (i % 4), i * 0.42),
+      d: wavePath(0.5 + i * 1.15, 4.5 + (i % 6), 8 + (i % 5), i * 0.28),
     });
   }
-  // Second wave set, phase-shifted for denser cross-hatch.
-  for (let i = 0; i < 48; i += 1) {
+  // Phase-shifted overlay for cross-hatch density.
+  for (let i = 0; i < 180; i += 1) {
     waves.push({
       key: `w2-${i}`,
-      d: wavePath(4 + i * 5.5, 9 + (i % 4), 4.5 + (i % 3), i * 0.9 + 1.2),
+      d: wavePath(1 + i * 1.55, 6 + (i % 5), 5.5 + (i % 4), i * 0.62 + 0.9),
+    });
+  }
+  // Fine shallow fill.
+  for (let i = 0; i < 140; i += 1) {
+    waves.push({
+      key: `w3-${i}`,
+      d: wavePath(0.25 + i * 2, 3.2 + (i % 3), 9 + (i % 4), i * 0.95 + 1.4),
     });
   }
   const arcs = [];
-  for (let i = 0; i < 28; i += 1) {
-    arcs.push({ key: `al${i}`, cx: 70, cy: 160, r: 24 + i * 10 });
-    arcs.push({ key: `ar${i}`, cx: 710, cy: 110, r: 22 + i * 11 });
-    arcs.push({ key: `ac${i}`, cx: 390, cy: 300, r: 50 + i * 12 });
-    arcs.push({ key: `am${i}`, cx: 250, cy: -20, r: 40 + i * 13 });
+  for (let i = 0; i < 70; i += 1) {
+    arcs.push({ key: `al${i}`, cx: 70, cy: 160, r: 10 + i * 4.5 });
+    arcs.push({ key: `ar${i}`, cx: 710, cy: 110, r: 8 + i * 5 });
+    arcs.push({ key: `ac${i}`, cx: 390, cy: 300, r: 18 + i * 5.5 });
+    arcs.push({ key: `am${i}`, cx: 250, cy: -20, r: 14 + i * 5.5 });
+    arcs.push({ key: `abl${i}`, cx: 40, cy: 40, r: 8 + i * 5 });
+    arcs.push({ key: `abr${i}`, cx: 740, cy: 240, r: 10 + i * 5 });
+    arcs.push({ key: `amid${i}`, cx: 480, cy: 80, r: 12 + i * 5 });
   }
 
   return (
@@ -63,24 +74,24 @@ const CheckPattern = () => {
       aria-hidden="true"
     >
       <rect width="776" height="268" fill="#f4f1e0" />
-      <g fill="none" stroke="#d8d9d0" strokeWidth="0.55" opacity="0.85">
+      <g fill="none" stroke="#d8d9d0" strokeWidth="0.4" opacity="0.95">
         {waves.map((w) => (
           <path key={w.key} d={w.d} />
         ))}
       </g>
-      <g fill="none" stroke="#d4d5cc" strokeWidth="0.5" opacity="0.55">
+      <g fill="none" stroke="#d4d5cc" strokeWidth="0.4" opacity="0.6">
         {arcs.map((a) => (
           <circle key={a.key} cx={a.cx} cy={a.cy} r={a.r} />
         ))}
       </g>
-      <g fill="none" stroke="#d6d7ce" strokeWidth="0.5" opacity="0.4">
-        {Array.from({ length: 22 }, (_, i) => -160 + i * 48).map((x) => (
+      <g fill="none" stroke="#d6d7ce" strokeWidth="0.4" opacity="0.5">
+        {Array.from({ length: 56 }, (_, i) => -200 + i * 20).map((x) => (
           <path
             key={`d1-${x}`}
             d={`M${x} 280 Q ${x + 100} 36 ${x + 260} -30`}
           />
         ))}
-        {Array.from({ length: 22 }, (_, i) => -120 + i * 48).map((x) => (
+        {Array.from({ length: 56 }, (_, i) => -170 + i * 20).map((x) => (
           <path
             key={`d2-${x}`}
             d={`M${x + 260} 280 Q ${x + 100} 36 ${x} -30`}
@@ -214,15 +225,16 @@ const SectionTitle = ({ children }) => (
   </div>
 );
 
-const DottedRule = ({ left, width }) => (
-  <div style={at(left, 0, { width, borderTop: "1.5px dotted #8a8a8a" })}>
-    <span
-      style={at(left === 20 ? 0 : width - 1, -4, {
-        height: 7,
-        borderLeft: "1.5px dotted #8a8a8a",
-      })}
-    />
-  </div>
+const DottedRule = ({ flex = false, width }) => (
+  <div
+    style={{
+      ...(flex
+        ? { flex: 1, minWidth: 0 }
+        : { width, position: "relative" }),
+      height: 0,
+      borderTop: "1.5px dotted #8a8a8a",
+    }}
+  />
 );
 
 const LINE_ITEM_COLUMNS = [
@@ -279,14 +291,14 @@ const CheckStatementTemplate = ({ data }) => {
       >
         <div
           style={{
-            height: 24,
-            lineHeight: "24px",
+            height: 26,
+            lineHeight: "26px",
             background: CHECK_BANNER,
             color: "#ffffff",
-            fontSize: 10,
+            fontSize: 11,
             fontWeight: 700,
             textAlign: "center",
-            letterSpacing: 0.35,
+            letterSpacing: 0.6,
             textTransform: "uppercase",
           }}
         >
@@ -302,48 +314,38 @@ const CheckStatementTemplate = ({ data }) => {
         >
           <CheckPattern />
 
-          {/* Logo + company address */}
-          <div
-            style={at(18, 14, {
-              display: "flex",
-              alignItems: "flex-start",
-              gap: 10,
-              width: 430,
-            })}
-          >
+          {/* Logo stacked above address (matches reference header) */}
+          <div style={at(18, 12, { width: 360 })}>
             {company.logo ? (
-              <CompanyLogo
-                src={company.logo}
-                boxWidth={78}
-                boxHeight={62}
-                shrink
-              />
+              <div style={{ marginBottom: 6 }}>
+                <CompanyLogo
+                  src={company.logo}
+                  boxWidth={92}
+                  boxHeight={52}
+                  shrink
+                />
+              </div>
             ) : null}
-            <div style={{ minWidth: 0, paddingTop: 2 }}>
-              <div
-                style={{
-                  fontSize: 15,
-                  fontWeight: 700,
-                  lineHeight: "19px",
-                  marginBottom: 2,
-                }}
-              >
-                {company.name}
-              </div>
-              <div style={{ fontSize: 11.5, lineHeight: "15.5px" }}>
-                <div>{company.address || "COMPANY ADDRESS"}</div>
-                <div>{company.cityLine || "CITY, STATE ZIP"}</div>
-              </div>
+            <div
+              style={{
+                fontSize: 11.5,
+                lineHeight: "15px",
+                textTransform: "uppercase",
+                letterSpacing: 0.2,
+              }}
+            >
+              <div>{company.address || "COMPANY ADDRESS"}</div>
+              <div>{company.cityLine || "CITY, STATE ZIP"}</div>
             </div>
           </div>
 
           {/* Check meta */}
           <div
-            style={at(500, 16, {
+            style={at(500, 14, {
               width: 256,
               textAlign: "right",
-              fontSize: 12,
-              lineHeight: "17px",
+              fontSize: 12.5,
+              lineHeight: "18px",
             })}
           >
             <div>
@@ -355,43 +357,39 @@ const CheckStatementTemplate = ({ data }) => {
             </div>
           </div>
 
-          {/* Payee + bordered amount */}
+          {/* Payee + amount on matching underline lines */}
           <div
-            style={at(18, 100, {
-              width: 548,
+            style={at(18, 112, {
+              width: 520,
               fontSize: 12.5,
               lineHeight: "20px",
-              borderBottom: "1px solid #2f2f2f",
+              borderBottom: "1.5px solid #1a1a1a",
               whiteSpace: "nowrap",
               overflow: "hidden",
-              paddingBottom: 2,
+              paddingBottom: 3,
             })}
           >
             <span style={{ fontWeight: 700 }}>PAY TO THE ORDER OF:</span>
             &nbsp; {employee.name}
           </div>
           <div
-            style={at(580, 94, {
-              width: 176,
-              height: 28,
-              border: "1.5px solid #1a1a1a",
-              boxSizing: "border-box",
-              display: "flex",
-              alignItems: "center",
-              padding: "0 8px",
-              background: "rgba(255,255,255,0.35)",
+            style={at(560, 112, {
+              width: 196,
               fontSize: 13,
               fontWeight: 700,
+              lineHeight: "20px",
+              borderBottom: "1.5px solid #1a1a1a",
+              paddingBottom: 3,
               letterSpacing: 0.2,
+              whiteSpace: "nowrap",
             })}
           >
-            <span style={{ marginRight: 6 }}>$</span>
-            <span style={{ flex: 1, textAlign: "right" }}>{amountDisplay}</span>
+            $&nbsp;{amountDisplay}
           </div>
 
           {/* Legal amount */}
           <div
-            style={at(18, 132, {
+            style={at(18, 146, {
               width: 738,
               fontSize: 12,
               lineHeight: "20px",
@@ -406,7 +404,7 @@ const CheckStatementTemplate = ({ data }) => {
           </div>
 
           <div
-            style={at(18, 178, {
+            style={at(18, 190, {
               fontSize: 10,
               fontWeight: 700,
               letterSpacing: 0.4,
@@ -416,21 +414,20 @@ const CheckStatementTemplate = ({ data }) => {
           </div>
 
           <div
-            style={at(470, 188, {
+            className="pinyon-script-regular"
+            style={at(470, 192, {
               width: 286,
               textAlign: "center",
-              fontFamily:
-                "'Brush Script MT', 'Segoe Script', 'Lucida Handwriting', cursive",
               fontSize: 22,
               lineHeight: "34px",
               whiteSpace: "nowrap",
               overflow: "hidden",
             })}
           >
-            {company.name}
+            <p>{company.checkSigner}</p>
           </div>
           <div
-            style={at(470, 224, {
+            style={at(470, 228, {
               width: 286,
               borderTop: "1px solid #2f2f2f",
               textAlign: "center",
@@ -445,30 +442,37 @@ const CheckStatementTemplate = ({ data }) => {
       </div>
 
       {/* Gap between check and statement */}
-      <div style={at(20, 328, { width: 776, height: 18 })} />
+      <div style={at(20, 318, { width: 776, height: 10 })} />
 
-      {/* Statement heading */}
-      <div style={at(20, 346, { width: 776, height: 20 })}>
-        <div style={{ position: "relative", width: "100%", height: "100%" }}>
-          <DottedRule left={0} width={268} />
-          <div
-            style={at(268, -2, {
-              width: 240,
-              textAlign: "center",
-              fontSize: 14,
-              fontWeight: 700,
-            })}
-          >
-            STATEMENT OF EARNINGS
-          </div>
-          <div style={at(508, 0, { width: 268 })}>
-            <DottedRule left={0} width={268} />
-          </div>
+      {/* Statement heading — lines vertically centered with title */}
+      <div
+        style={at(20, 328, {
+          width: 776,
+          height: 20,
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+        })}
+      >
+        <DottedRule flex />
+        <div
+          style={{
+            flex: "0 0 auto",
+            textAlign: "center",
+            fontSize: 14,
+            fontWeight: 700,
+            lineHeight: "20px",
+            letterSpacing: 0.3,
+            whiteSpace: "nowrap",
+          }}
+        >
+          STATEMENT OF EARNINGS
         </div>
+        <DottedRule flex />
       </div>
 
       {/* Summary row */}
-      <div style={at(20, 378, { width: 776 })}>
+      <div style={at(20, 360, { width: 776 })}>
         <Table
           columns={[
             { key: "id", label: "Employee ID", width: 151 },
@@ -491,7 +495,7 @@ const CheckStatementTemplate = ({ data }) => {
       </div>
 
       {/* Left column */}
-      <div style={at(20, 438, { width: 464 })}>
+      <div style={at(20, 420, { width: 464 })}>
         <div style={{ border: CELL_BORDER, borderTop: "none" }}>
           <Table
             header={EARNINGS_HEADER}
@@ -551,9 +555,9 @@ const CheckStatementTemplate = ({ data }) => {
 
       {/* Right column */}
       <div
-        style={at(500, 438, {
+        style={at(500, 420, {
           width: 296,
-          height: 560,
+          height: 580,
           display: "flex",
           flexDirection: "column",
         })}

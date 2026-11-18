@@ -63,6 +63,7 @@ const paystubEmployer = z.object({
   companyZip: zip("Company ZIP"),
   companyEin: optionalEin,
   companyPhone: optional(30),
+  checkSigner: optional(100),
 });
 
 const paystubEmployee = z.object({

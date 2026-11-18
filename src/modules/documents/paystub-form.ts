@@ -14,6 +14,7 @@ export type PaystubEmployer = {
   companyZip: string;
   companyEin: string;
   companyPhone: string;
+  checkSigner: string;
 };
 
 export type PaystubEmployee = {
@@ -144,10 +145,14 @@ export function normalizePaystubFormData(input: unknown): unknown {
   const { calculation: _calculation, template: _template, ...rest } = input;
 
   if (isRecord(rest.steps) && isRecord(rest.steps.employer)) {
+    const employer = { ...rest.steps.employer } as Record<string, unknown>;
+    if (typeof employer.checkSigner !== "string") {
+      employer.checkSigner = "";
+    }
     return {
       schemaVersion: PAYSTUB_SCHEMA_VERSION,
       steps: {
-        employer: rest.steps.employer,
+        employer,
         employee: rest.steps.employee ?? {},
         payDetails: rest.steps.payDetails ?? {},
         directDeposit: isRecord(rest.steps.directDeposit)
@@ -168,6 +173,7 @@ export function normalizePaystubFormData(input: unknown): unknown {
       companyZip,
       companyEin,
       companyPhone,
+      checkSigner,
       employeeName,
       employeePhone,
       employeeAddress,
@@ -207,6 +213,7 @@ export function normalizePaystubFormData(input: unknown): unknown {
           companyZip,
           companyEin,
           companyPhone,
+          checkSigner: typeof checkSigner === "string" ? checkSigner : "",
         },
         employee: {
           employeeName,
