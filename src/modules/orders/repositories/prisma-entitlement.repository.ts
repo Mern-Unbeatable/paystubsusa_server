@@ -11,7 +11,17 @@ export class PrismaEntitlementRepository implements EntitlementRepository {
   findWithOrder(id: string) {
     return prisma.entitlement.findUnique({
       where: { id },
-      include: { order: { select: { id: true, userId: true, email: true, status: true } } },
+      include: {
+        order: {
+          select: {
+            id: true,
+            userId: true,
+            email: true,
+            status: true,
+            items: { select: { productCode: true } },
+          },
+        },
+      },
     });
   }
 

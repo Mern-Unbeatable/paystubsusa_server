@@ -22,7 +22,7 @@
   "netPay": "$1,908.62",
   "earnings": [
     { "desc": "Regular", "rate": "80h × $28.00", "amount": "$2,240.00" },
-    { "desc": "Overtime", "rate": "4h × 1.5", "amount": "$168.00" },
+    { "desc": "Overtime", "rate": "4h × $42.00", "amount": "$168.00" },
     { "desc": "Bonus", "rate": "", "amount": "$150.00" }
   ],
   "grossPay": "$2,558.00",

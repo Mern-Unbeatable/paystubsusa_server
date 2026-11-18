@@ -16,7 +16,7 @@ const TemplateDocument = ({ template, data }) => {
       body = null;
   }
 
-  // 09/10 embed DD in-body — never append a second stub.
+  // 09 embeds DD in-body; 10 never shows a DD slip — never append a second stub.
   const skipAppendedDd =
     template?.document === "earnings-statement" ||
     template?.document === "check-statement";
