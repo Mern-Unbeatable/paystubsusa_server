@@ -68,6 +68,9 @@ function setup(rows: TemplateWithUsage[], { deleteResult = true, createResult = 
   const repo = {
     findById: vi.fn(async (id: string) => rows.find((r) => r.id === id) ?? null),
     findWithUsage: vi.fn(async (id: string) => rows.find((r) => r.id === id) ?? null),
+    maxSortOrder: vi.fn(async (documentType: string) =>
+      rows.filter((r) => r.documentType === documentType).reduce((max, r) => Math.max(max, r.sortOrder), 0),
+    ),
     create: vi.fn(async (t: NewTemplate) => (createResult ? row(t.code, t) : null)),
     update: vi.fn(async (id: string, data: object) => ({ ...rows.find((r) => r.id === id)!, ...data })),
     delete: vi.fn(async () => deleteResult),
@@ -82,6 +85,12 @@ describe("CatalogService admin template rules", () => {
     const { service, repo } = setup([]);
     await expect(service.createTemplate(input())).resolves.toMatchObject({ code: "custom-1" });
     expect(repo.create).toHaveBeenCalledOnce();
+  });
+
+  it("always appends a new template after the last of that type", async () => {
+    const { service, repo } = setup([row("01", { sortOrder: 10 })]);
+    await service.createTemplate(input({ sortOrder: 1 }));
+    expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ sortOrder: 11 }));
   });
 
   it.each([

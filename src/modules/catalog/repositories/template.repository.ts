@@ -56,6 +56,8 @@ export interface TemplateRepository {
   search(filter: TemplateFilter, page: PageRequest): Promise<{ items: TemplateWithUsage[]; total: number }>;
   findById(id: string): Promise<TemplateRow | null>;
   findWithUsage(id: string): Promise<TemplateWithUsage | null>;
+  /** Highest sortOrder for this document type, or 0 when none exist. */
+  maxSortOrder(documentType: DocumentType): Promise<number>;
   /** Returns null when the code is already taken for this document type. */
   create(input: NewTemplate): Promise<TemplateRow | null>;
   update(id: string, input: TemplateUpdate): Promise<TemplateRow>;
