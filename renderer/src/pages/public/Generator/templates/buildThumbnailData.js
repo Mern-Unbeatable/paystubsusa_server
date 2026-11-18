@@ -1,4 +1,5 @@
 import { formatCurrency } from "../utils/formatCurrency";
+import { amountToCheckWords } from "../utils/numberToWords";
 import { formatDate } from "./buildPaystubDocument";
 import { toLogoSrc } from "../utils/readLogoFile";
 
@@ -21,7 +22,7 @@ export const buildThumbnailData = (formData, calculations) => {
     if (toNumber(formData.overtimeHours) > 0) {
       earnings.push({
         desc: "Overtime",
-        rate: `${toNumber(formData.overtimeHours)}h × 1.5`,
+        rate: `${toNumber(formData.overtimeHours)}h × ${formatCurrency(toNumber(formData.hourlyRate) * 1.5)}`,
         amount: formatCurrency(calculations.overtimeEarnings),
       });
     }
@@ -60,10 +61,43 @@ export const buildThumbnailData = (formData, calculations) => {
     grossPay: formatCurrency(calculations.totalGross),
     taxes: formData.taxes.map((t) => ({ desc: t.label, amount: formatCurrency(toNumber(t.amount)) })),
     totalTaxes: formatCurrency(calculations.totalTaxes),
+    deductions: (formData.deductions ?? []).map((d) => ({
+      desc: d.desc,
+      amount: formatCurrency(toNumber(d.amount)),
+    })),
+    totalDeductions: formatCurrency(calculations.totalDeductions),
     summary: {
       gross: formatCurrency(calculations.totalGross),
       deductions: formatCurrency(calculations.allDeductions),
       net: formatCurrency(calculations.netPay),
     },
+    period: {
+      payDate: formatDate(formData.payDate),
+    },
+    directDeposit: (() => {
+      const dd = formData.directDeposit ?? {};
+      if (!dd.enabled) {
+        return {
+          enabled: false,
+          ...(dd.includeInPdf === undefined
+            ? {}
+            : { includeInPdf: dd.includeInPdf }),
+        };
+      }
+      return {
+        enabled: true,
+        ...(dd.includeInPdf === undefined
+          ? {}
+          : { includeInPdf: dd.includeInPdf }),
+        bankName: dd.bankName || "",
+        accountHolderName: dd.accountHolderName || "",
+        accountNumber: dd.accountNumber || "",
+        routingNumber: dd.routingNumber || "",
+        checkNumber: dd.checkNumber || "",
+        netPay: calculations.netPay,
+        netPayText: formatCurrency(calculations.netPay),
+        netWords: amountToCheckWords(calculations.netPay),
+      };
+    })(),
   };
 };

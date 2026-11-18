@@ -5,6 +5,7 @@ import "../index.css";
 import "./renderer.css";
 import PaystubPrintDocument from "../pages/public/Generator/components/common/print/PaystubPrintDocument";
 import { calculatePaystub } from "../pages/public/Generator/hooks/usePaystubFormData";
+import { flattenSteps } from "../pages/public/Generator/utils/paystubFormShape";
 import { toGeneratorTemplate } from "../pages/public/Generator/utils/generatorTemplate";
 import W2FormDocument from "../pages/public/W2/templates/W2FormDocument";
 import Nec1099FormDocument from "../pages/public/1099/templates/Nec1099FormDocument";
@@ -46,14 +47,16 @@ const waitForImages = () =>
 
 function renderForType(type, template, formData) {
   switch (type) {
-    case "paystub":
+    case "paystub": {
+      const flat = formData?.steps ? flattenSteps(formData.steps) : formData;
       return (
         <PaystubPrintDocument
           template={toGeneratorTemplate(template)}
-          formData={formData}
-          calculations={calculatePaystub(formData)}
+          formData={flat}
+          calculations={calculatePaystub(flat)}
         />
       );
+    }
     case "w2":
       return (
         <FormPage>

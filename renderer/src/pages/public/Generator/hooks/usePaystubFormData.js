@@ -1,73 +1,49 @@
-import { useMemo } from "react";
-import { useSessionStorageState } from "../../../../hooks/useSessionStorageState";
+import { useEffect, useMemo, useState } from "react";
+import {
+  coerceToSteps,
+  DEFAULT_STEPS,
+  fieldStep,
+  flattenSteps,
+  toPaystubApiFormData,
+} from "../utils/paystubFormShape";
 
 const FORM_DATA_STORAGE_KEY = "paystubGenerator.formData";
 
-// Defaults match the Figma mock so the live preview is populated on first load.
-const DEFAULT_FORM_DATA = {
-  // Step 1: Employer Information
-  companyLogo: "", // data URL of the uploaded logo
-  companyName: "Acme Corporation",
-  companyAddress: "123 Main Street",
-  companyCity: "Des Moines",
-  companyState: "IA",
-  companyZip: "50309",
-  companyEin: "12-3456789",
-  companyPhone: "",
-
-  // Step 2: Employee Information
-  employeeName: "Jane Doe",
-  employeeAddress: "123 main street",
-  employeeCity: "dhaka",
-  employeeState: "IA",
-  employeeZip: "10001",
-  employeeId: "EMP-002",
-
-  // Step 3: Pay Details
-  payPeriodStart: "2026-10-24",
-  payPeriodEnd: "2026-10-29",
-  payDate: "2026-10-30",
-  payFrequency: "Semi-Monthly",
-  payType: "Hourly", // 'Hourly' | 'Salary'
-  hourlyRate: "200",
-  regularHours: "80",
-  overtimeHours: "20",
-  salaryAmount: "22000",
-
-  additionalEarnings: [],
-  taxes: [
-    { id: "fed", label: "Federal Income Tax", amount: "0.00" },
-    { id: "ss", label: "Social Security", amount: "0.00" },
-    { id: "med", label: "Medicare", amount: "0.00" },
-    { id: "state", label: "State Income Tax", amount: "0.00" },
-  ],
-  deductions: [],
+const readSteps = () => {
+  if (typeof window === "undefined") return structuredClone(DEFAULT_STEPS);
+  try {
+    const raw = window.sessionStorage.getItem(FORM_DATA_STORAGE_KEY);
+    return coerceToSteps(raw === null ? null : JSON.parse(raw));
+  } catch {
+    return structuredClone(DEFAULT_STEPS);
+  }
 };
 
 const sumAmounts = (items) =>
   (items ?? []).reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
 
-export const calculatePaystub = (formData) => {
+/** Accepts payDetails object or flat form fields. */
+export const calculatePaystub = (pay) => {
   let regularEarnings = 0;
   let overtimeEarnings = 0;
   let totalGross = 0;
 
-  if (formData.payType === "Hourly") {
-    const rate = parseFloat(formData.hourlyRate) || 0;
-    const hours = parseFloat(formData.regularHours) || 0;
-    const otHours = parseFloat(formData.overtimeHours) || 0;
+  if (pay.payType === "Hourly") {
+    const rate = parseFloat(pay.hourlyRate) || 0;
+    const hours = parseFloat(pay.regularHours) || 0;
+    const otHours = parseFloat(pay.overtimeHours) || 0;
     regularEarnings = rate * hours;
     overtimeEarnings = rate * 1.5 * otHours;
     totalGross = regularEarnings + overtimeEarnings;
   } else {
-    totalGross = parseFloat(formData.salaryAmount) || 0;
+    totalGross = parseFloat(pay.salaryAmount) || 0;
     regularEarnings = totalGross;
   }
 
-  totalGross += sumAmounts(formData.additionalEarnings);
+  totalGross += sumAmounts(pay.additionalEarnings);
 
-  const totalTaxes = sumAmounts(formData.taxes);
-  const totalDeductions = sumAmounts(formData.deductions);
+  const totalTaxes = sumAmounts(pay.taxes);
+  const totalDeductions = sumAmounts(pay.deductions);
   const allDeductions = totalTaxes + totalDeductions;
   const netPay = Math.max(0, totalGross - allDeductions);
 
@@ -82,7 +58,6 @@ export const calculatePaystub = (formData) => {
   };
 };
 
-// Same required fields as the server's paystub schema; formats are still validated there.
 const REQUIRED_FIELDS = [
   { step: 1, key: "companyName", label: "Company name" },
   { step: 1, key: "companyAddress", label: "Company address" },
@@ -90,6 +65,7 @@ const REQUIRED_FIELDS = [
   { step: 1, key: "companyState", label: "Company state" },
   { step: 1, key: "companyZip", label: "Company ZIP code" },
   { step: 2, key: "employeeName", label: "Employee name" },
+  { step: 2, key: "exemptions", label: "Exemptions" },
   { step: 2, key: "employeeAddress", label: "Employee address" },
   { step: 2, key: "employeeCity", label: "Employee city" },
   { step: 2, key: "employeeState", label: "Employee state" },
@@ -101,52 +77,127 @@ const REQUIRED_FIELDS = [
   { step: 3, key: "hourlyRate", label: "Hourly rate", when: (d) => d.payType === "Hourly" },
   { step: 3, key: "regularHours", label: "Regular hours", when: (d) => d.payType === "Hourly" },
   { step: 3, key: "salaryAmount", label: "Gross salary amount", when: (d) => d.payType !== "Hourly" },
+  {
+    step: 3,
+    key: "bankName",
+    label: "Bank name",
+    when: (d) => d.directDeposit?.enabled,
+    read: (d) => d.directDeposit?.bankName,
+  },
+  {
+    step: 3,
+    key: "accountHolderName",
+    label: "Account holder name",
+    when: (d) => d.directDeposit?.enabled,
+    read: (d) => d.directDeposit?.accountHolderName,
+  },
+  {
+    step: 3,
+    key: "routingNumber",
+    label: "Routing number",
+    when: (d) => d.directDeposit?.enabled,
+    read: (d) => d.directDeposit?.routingNumber,
+  },
+  {
+    step: 3,
+    key: "accountNumber",
+    label: "Account number",
+    when: (d) => d.directDeposit?.enabled,
+    read: (d) => d.directDeposit?.accountNumber,
+  },
 ];
 
 /** First empty required field as `{ step, label }`, or null when the form is complete. */
-export const findIncompleteField = (formData) =>
-  REQUIRED_FIELDS.find(
-    (f) => (!f.when || f.when(formData)) && !String(formData[f.key] ?? "").trim(),
-  ) ?? null;
+export const findIncompleteField = (formDataOrSteps) => {
+  const flat = formDataOrSteps?.employer
+    ? flattenSteps(formDataOrSteps)
+    : formDataOrSteps?.steps
+      ? flattenSteps(formDataOrSteps.steps)
+      : formDataOrSteps;
+  return (
+    REQUIRED_FIELDS.find((f) => {
+      if (f.when && !f.when(flat)) return false;
+      const value = f.read ? f.read(flat) : flat[f.key];
+      return !String(value ?? "").trim();
+    }) ?? null
+  );
+};
 
 /** Paystub details shared across every page of the generator flow. */
 export function usePaystubFormData() {
-  const [formData, setFormData] = useSessionStorageState(
-    FORM_DATA_STORAGE_KEY,
-    DEFAULT_FORM_DATA,
-  );
+  const [steps, setSteps] = useState(readSteps);
 
-  const calculations = useMemo(() => calculatePaystub(formData), [formData]);
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(FORM_DATA_STORAGE_KEY, JSON.stringify(steps));
+    } catch {
+      // Storage can be unavailable; state still works in memory.
+    }
+  }, [steps]);
 
-  const updateField = (field, value) =>
-    setFormData((prev) => ({ ...prev, [field]: value }));
+  const formData = useMemo(() => flattenSteps(steps), [steps]);
+  const calculations = useMemo(() => calculatePaystub(steps.payDetails), [steps.payDetails]);
+
+  const updateField = (field, value) => {
+    const step = fieldStep(field);
+    if (!step) return;
+    setSteps((prev) => ({
+      ...prev,
+      [step]: { ...prev[step], [field]: value },
+    }));
+  };
+
+  const updateDirectDeposit = (patch) =>
+    setSteps((prev) => ({
+      ...prev,
+      directDeposit: { ...prev.directDeposit, ...patch },
+    }));
+
+  const patchPayDetails = (updater) =>
+    setSteps((prev) => ({
+      ...prev,
+      payDetails: typeof updater === "function" ? updater(prev.payDetails) : { ...prev.payDetails, ...updater },
+    }));
 
   const addRow = (listKey, row) =>
-    setFormData((prev) => ({
-      ...prev,
-      [listKey]: [...prev[listKey], { id: Date.now().toString(), ...row }],
+    patchPayDetails((pay) => ({
+      ...pay,
+      [listKey]: [...pay[listKey], { id: Date.now().toString(), ...row }],
     }));
 
   const removeRow = (listKey, id) =>
-    setFormData((prev) => ({
-      ...prev,
-      [listKey]: prev[listKey].filter((item) => item.id !== id),
+    patchPayDetails((pay) => ({
+      ...pay,
+      [listKey]: pay[listKey].filter((item) => item.id !== id),
     }));
 
   return {
+    steps,
     formData,
-    setFormData,
+    setFormData: (next) => {
+      if (typeof next === "function") {
+        setSteps((prev) => coerceToSteps(next(flattenSteps(prev))));
+        return;
+      }
+      setSteps(coerceToSteps(next));
+    },
     updateField,
+    updateDirectDeposit,
     calculations,
+    /** API / encrypt payload — never includes client calculation. */
+    toApiFormData: () => toPaystubApiFormData(steps),
     handleAddTax: () => addRow("taxes", { label: "Custom Tax", amount: "0.00" }),
     handleRemoveTax: (id) => removeRow("taxes", id),
     handleTaxAmountChange: (id, amount) =>
-      setFormData((prev) => ({
-        ...prev,
-        taxes: prev.taxes.map((t) => (t.id === id ? { ...t, amount } : t)),
+      patchPayDetails((pay) => ({
+        ...pay,
+        taxes: pay.taxes.map((t) => (t.id === id ? { ...t, amount } : t)),
       })),
-    handleAddEarning: () =>
-      addRow("additionalEarnings", { desc: "Bonus / Commission", amount: "0.00" }),
+    handleAddEarning: (desc = "Custom") =>
+      addRow("additionalEarnings", {
+        desc: desc === "Custom" ? "" : desc,
+        amount: "0.00",
+      }),
     handleRemoveEarning: (id) => removeRow("additionalEarnings", id),
     handleAddDeduction: () =>
       addRow("deductions", { desc: "401(k) / Insurance", amount: "0.00" }),

@@ -4,6 +4,7 @@ import { env, isProduction } from "./config/env.ts";
 import { createApp } from "./app.ts";
 import { createContainer } from "./container.ts";
 import { prisma } from "./shared/db/prisma.ts";
+import { findChromiumExecutable } from "./shared/chromium.ts";
 import { logger } from "./shared/logger.ts";
 import { JobRunner } from "./shared/jobs/job-runner.ts";
 import { startScheduler } from "./shared/jobs/scheduler.ts";
@@ -14,22 +15,30 @@ import { maintenanceJobs } from "./jobs/retention.job.ts";
 
 function assertRendererBundle() {
   if (!env.JOBS_ENABLED) return;
-  if (!env.RENDERER_BUNDLE_PATH) {
-    const msg =
-      "RENDERER_BUNDLE_PATH is not set; document PDF renders will fail";
-    if (isProduction) throw new Error(msg);
-    logger.warn(msg);
-    return;
-  }
   const bundle = path.resolve(env.RENDERER_BUNDLE_PATH);
   if (!existsSync(bundle)) {
-    const msg = `Renderer bundle not found at ${bundle}; run npm run build:renderer in web/`;
+    const msg = `Renderer bundle not found at ${bundle}; run npm run build:renderer`;
     if (isProduction) throw new Error(msg);
     logger.warn(msg);
   }
 }
 
+function assertChromium() {
+  if (!env.JOBS_ENABLED) return;
+  const executablePath = findChromiumExecutable(env.CHROMIUM_EXECUTABLE_PATH);
+  if (executablePath) {
+    logger.info({ executablePath }, "Chromium available for PDF rendering");
+    return;
+  }
+  // Do not crash-loop the API: Coolify Nixpacks images often lack apt Chromium until
+  // `npm start` → scripts/ensure-chromium.mjs finishes, or Dockerfile is used.
+  logger.error(
+    "Chromium not found after ensure-chromium. PDF jobs will fail. Prefer Coolify Build strategy = Dockerfile, or set CHROMIUM_EXECUTABLE_PATH to a real binary.",
+  );
+}
+
 assertRendererBundle();
+assertChromium();
 
 const container = createContainer();
 const { services: s, repositories: r } = container;

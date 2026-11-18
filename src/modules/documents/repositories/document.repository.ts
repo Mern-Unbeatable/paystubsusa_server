@@ -80,6 +80,7 @@ export interface NewDocument {
   fileName: string;
   formDataEnc: Uint8Array<ArrayBuffer>;
   formDataKeyId: string;
+  schemaVersion?: number;
   status: "awaiting_payment" | "queued";
 }
 
@@ -96,8 +97,8 @@ export interface DocumentRepository {
   markReady(id: string, pdfStorageKey: string, pdfSha256: string): Promise<void>;
   markFailed(id: string): Promise<void>;
   incrementDownloads(id: string): Promise<void>;
-  /** ready | failed → queued, if the form data still exists. */
-  requeue(id: string, tx: Tx): Promise<boolean>;
+  /** ready | failed | queued → queued, if the form data still exists. `tx` optional for in-process repair. */
+  requeue(id: string, tx?: Tx): Promise<boolean>;
   purgeFormDataRenderedBefore(before: Date): Promise<number>;
   /** Guest-order PDFs older than `before` ([DECISION] 5: guests keep PDFs one year). */
   listGuestPdfsBefore(before: Date, limit: number): Promise<{ id: string; pdfStorageKey: string }[]>;

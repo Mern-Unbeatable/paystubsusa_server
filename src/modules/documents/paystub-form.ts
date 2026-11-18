@@ -1,0 +1,267 @@
+/**
+ * Paystub formData v2 (step-based) + legacy flat v1 normalization.
+ * Calculation is never persisted from the client — server computes it.
+ */
+
+export const PAYSTUB_SCHEMA_VERSION = 2 as const;
+
+export type PaystubEmployer = {
+  companyLogo: string;
+  companyName: string;
+  companyAddress: string;
+  companyCity: string;
+  companyState: string;
+  companyZip: string;
+  companyEin: string;
+  companyPhone: string;
+  checkSigner: string;
+};
+
+export type PaystubEmployee = {
+  employeeName: string;
+  employeePhone: string;
+  employeeAddress: string;
+  employeeCity: string;
+  employeeState: string;
+  employeeZip: string;
+  employeeId: string;
+  ssnLast4: string;
+  exemptions: string;
+  maritalStatus: string;
+  employmentType: string;
+};
+
+export type PaystubPayDetails = {
+  payPeriodStart: string;
+  payPeriodEnd: string;
+  payDate: string;
+  payFrequency:
+    | "Daily"
+    | "Weekly"
+    | "Bi-Weekly"
+    | "Semi-Monthly"
+    | "Monthly"
+    | "Quarterly"
+    | "Semi-Annually"
+    | "Annually";
+  payType: "Hourly" | "Salary";
+  hourlyRate: string;
+  regularHours: string;
+  overtimeHours: string;
+  salaryAmount: string;
+  additionalEarnings: { id: string; desc: string; amount: string }[];
+  taxes: { id: string; label: string; amount: string }[];
+  deductions: { id: string; desc: string; amount: string }[];
+};
+
+export type PaystubDirectDeposit = {
+  enabled: boolean;
+  /**
+   * Paid-checkout entitlement for the detachable slip.
+   * `true` = purchased; `false` = explicitly not purchased; omitted = legacy (pre-addon) docs.
+   */
+  includeInPdf?: boolean;
+  bankName: string;
+  accountHolderName: string;
+  accountNumber: string;
+  routingNumber: string;
+  checkNumber: string;
+};
+
+export type PaystubSteps = {
+  employer: PaystubEmployer;
+  employee: PaystubEmployee;
+  payDetails: PaystubPayDetails;
+  directDeposit: PaystubDirectDeposit;
+};
+
+export type PaystubFormDataV2 = {
+  schemaVersion: typeof PAYSTUB_SCHEMA_VERSION;
+  steps: PaystubSteps;
+};
+
+/** Flat fields expected by PDF builders (plus optional nested directDeposit). */
+export type PaystubRenderFields = PaystubEmployer &
+  PaystubEmployee &
+  PaystubPayDetails & {
+    directDeposit: PaystubDirectDeposit;
+  };
+
+const emptyDd = (): PaystubDirectDeposit => ({
+  enabled: false,
+  bankName: "",
+  accountHolderName: "",
+  accountNumber: "",
+  routingNumber: "",
+  checkNumber: "",
+});
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+/**
+ * Server-only PDF entitlement for the Direct Deposit Slip.
+ * Never trust a client-sent `includeInPdf`; overwrite from purchase / redeem path.
+ */
+export function applyPaystubDdSlipEntitlement(
+  formData: unknown,
+  purchased: boolean,
+): unknown {
+  const normalized = normalizePaystubFormData(formData);
+  if (!isRecord(normalized) || !isRecord(normalized.steps)) return formData;
+  const prev = isRecord(normalized.steps.directDeposit)
+    ? normalized.steps.directDeposit
+    : {};
+  const directDeposit = purchased
+    ? { ...prev, enabled: true, includeInPdf: true }
+    : { ...prev, includeInPdf: false };
+  return {
+    ...normalized,
+    steps: {
+      ...normalized.steps,
+      directDeposit,
+    },
+  };
+}
+
+/** True when payload already uses the step-based shape. */
+export function isPaystubStepsPayload(input: unknown): boolean {
+  return isRecord(input) && isRecord(input.steps) && isRecord(input.steps.employer);
+}
+
+/** True when payload uses the legacy flat formData keys. */
+export function isPaystubFlatPayload(input: unknown): boolean {
+  return isRecord(input) && typeof input.companyName === "string" && !isRecord(input.steps);
+}
+
+/**
+ * Strip client-only fields and coerce legacy flat → `{ schemaVersion: 2, steps }`.
+ * Does not validate — Zod runs after this.
+ */
+export function normalizePaystubFormData(input: unknown): unknown {
+  if (!isRecord(input)) return input;
+
+  const { calculation: _calculation, template: _template, ...rest } = input;
+
+  if (isRecord(rest.steps) && isRecord(rest.steps.employer)) {
+    const employer = { ...rest.steps.employer } as Record<string, unknown>;
+    if (typeof employer.checkSigner !== "string") {
+      employer.checkSigner = "";
+    }
+    return {
+      schemaVersion: PAYSTUB_SCHEMA_VERSION,
+      steps: {
+        employer,
+        employee: rest.steps.employee ?? {},
+        payDetails: rest.steps.payDetails ?? {},
+        directDeposit: isRecord(rest.steps.directDeposit)
+          ? { ...emptyDd(), ...rest.steps.directDeposit }
+          : emptyDd(),
+      },
+    };
+  }
+
+  // Legacy flat v1
+  if (typeof rest.companyName === "string") {
+    const {
+      companyLogo,
+      companyName,
+      companyAddress,
+      companyCity,
+      companyState,
+      companyZip,
+      companyEin,
+      companyPhone,
+      checkSigner,
+      employeeName,
+      employeePhone,
+      employeeAddress,
+      employeeCity,
+      employeeState,
+      employeeZip,
+      employeeId,
+      ssnLast4,
+      exemptions,
+      maritalStatus,
+      employmentType,
+      payPeriodStart,
+      payPeriodEnd,
+      payDate,
+      payFrequency,
+      payType,
+      hourlyRate,
+      regularHours,
+      overtimeHours,
+      salaryAmount,
+      additionalEarnings,
+      taxes,
+      deductions,
+      directDeposit,
+      ..._ignored
+    } = rest;
+
+    return {
+      schemaVersion: PAYSTUB_SCHEMA_VERSION,
+      steps: {
+        employer: {
+          companyLogo,
+          companyName,
+          companyAddress,
+          companyCity,
+          companyState,
+          companyZip,
+          companyEin,
+          companyPhone,
+          checkSigner: typeof checkSigner === "string" ? checkSigner : "",
+        },
+        employee: {
+          employeeName,
+          employeePhone,
+          employeeAddress,
+          employeeCity,
+          employeeState,
+          employeeZip,
+          employeeId,
+          ssnLast4,
+          exemptions,
+          maritalStatus,
+          employmentType,
+        },
+        payDetails: {
+          payPeriodStart,
+          payPeriodEnd,
+          payDate,
+          payFrequency,
+          payType,
+          hourlyRate,
+          regularHours,
+          overtimeHours,
+          salaryAmount,
+          additionalEarnings,
+          taxes,
+          deductions,
+        },
+        directDeposit: isRecord(directDeposit) ? { ...emptyDd(), ...directDeposit } : emptyDd(),
+      },
+    };
+  }
+
+  return rest;
+}
+
+export function flattenPaystubSteps(steps: PaystubSteps): PaystubRenderFields {
+  return {
+    ...steps.employer,
+    ...steps.employee,
+    ...steps.payDetails,
+    directDeposit: steps.directDeposit ?? emptyDd(),
+  };
+}
+
+export function toPaystubFormDataV2(data: PaystubFormDataV2 | PaystubSteps): PaystubFormDataV2 {
+  if ("steps" in data && data.steps) {
+    return { schemaVersion: PAYSTUB_SCHEMA_VERSION, steps: data.steps };
+  }
+  return { schemaVersion: PAYSTUB_SCHEMA_VERSION, steps: data as PaystubSteps };
+}

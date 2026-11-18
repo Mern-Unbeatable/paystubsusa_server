@@ -14,7 +14,12 @@ import { actorOf, type AuditService } from "../audit/index.ts";
 import type { NotificationsService } from "../notifications/notifications.service.ts";
 import { env } from "../../config/env.ts";
 import { logger } from "../../shared/logger.ts";
-import { validateFormData, type DisplayFields } from "./form-data.ts";
+import {
+  PAYSTUB_SCHEMA_VERSION,
+  paystubFieldsForRender,
+  validateFormData,
+  type DisplayFields,
+} from "./form-data.ts";
 import { buildDocumentStorageKey } from "./storage-key.ts";
 import type { DocumentListFilter, DocumentRepository, DocumentWithOrder } from "./repositories/document.repository.ts";
 
@@ -90,6 +95,7 @@ export class DocumentsService {
         ...prepared.display,
         formDataEnc: prepared.formDataEnc,
         formDataKeyId: prepared.formDataKeyId,
+        schemaVersion: prepared.type === "paystub" ? PAYSTUB_SCHEMA_VERSION : 1,
         status: input.status,
       },
       tx,
@@ -147,12 +153,37 @@ export class DocumentsService {
     return toAdminDocumentDetail(await this.loadAccessible(principal, id));
   }
 
+  /**
+   * When the DB says ready but this node's LOCAL_STORAGE_DIR lacks the PDF (common when a
+   * remote Coolify worker rendered against a shared DB), re-render in-process so the signed
+   * URL can be served from this disk.
+   */
+  private async ensurePdfOnThisNode(documentId: string, key: string) {
+    if (await this.d.storage.get(key)) return;
+    logger.warn(
+      { documentId, key },
+      "PDF missing from LOCAL_STORAGE_DIR; re-rendering on this node for download",
+    );
+    if (!(await this.d.documents.requeue(documentId))) {
+      throw conflict("DOCUMENT_NOT_READY", "This document is still being prepared. Try again in a moment.");
+    }
+    await this.render(documentId, { attempt: 1, isFinalAttempt: true });
+  }
+
   /** Policy → order paid → document ready → audit → 5-minute pre-signed URL. */
   async download(principal: Principal, id: string, ctx: RequestContext) {
-    const doc = await this.loadAccessible(principal, id);
+    let doc = await this.loadAccessible(principal, id);
     if (!DOWNLOADABLE_ORDER_STATUSES.includes(doc.order.status)) throw notFound("DOCUMENT_NOT_FOUND", "Document not found");
     if (doc.status !== "ready" || !doc.pdfStorageKey) {
       throw conflict("DOCUMENT_NOT_READY", "This document is still being prepared. Try again in a moment.");
+    }
+    await this.ensurePdfOnThisNode(doc.id, doc.pdfStorageKey);
+    doc = await this.loadAccessible(principal, id);
+    if (doc.status !== "ready" || !doc.pdfStorageKey || !(await this.d.storage.get(doc.pdfStorageKey))) {
+      throw notFound(
+        "FILE_MISSING",
+        "This PDF file is missing from server storage. Ask an admin to regenerate the document.",
+      );
     }
     await this.d.audit.record({
       ...actorOf(principal),
@@ -190,7 +221,9 @@ export class DocumentsService {
     if (!doc) return;
     try {
       if (!doc.formDataEnc || !doc.formDataKeyId) throw new Error("Form data is not available");
-      const formData = decryptJson(doc.formDataEnc, doc.formDataKeyId);
+      const stored = decryptJson(doc.formDataEnc, doc.formDataKeyId);
+      // Paystub: normalize v1/v2 → flat render fields (builders + optional DD slip).
+      const formData = doc.type === "paystub" ? paystubFieldsForRender(stored) : stored;
       const pdf = await this.d.renderer.render({ type: doc.type, template: doc.template, formData });
       const sequence = await this.d.documents.ownerMonthSequence({
         documentId: doc.id,
