@@ -48,14 +48,25 @@ export class EntitlementsService {
       input.templateId,
       ent.documentType,
     );
-    // Honor DD on credit redemptions when the parent order purchased the add-on
-    // (except template 10 / check-statement, which never renders a slip).
+    // Credit docs get a DD slip only when the parent order bought it AND this
+    // form still has the package toggle on (`directDeposit.enabled`).
+    const orderBoughtDd = Boolean(
+      ent.order.items?.some((i) => i.productCode === PAYSTUB_DD_SLIP_PRODUCT_CODE),
+    );
+    const formWantsDd = (() => {
+      const fd = input.formData as {
+        steps?: { directDeposit?: { enabled?: boolean } };
+        directDeposit?: { enabled?: boolean };
+      } | null;
+      if (!fd || typeof fd !== "object") return false;
+      if (fd.steps?.directDeposit) return Boolean(fd.steps.directDeposit.enabled);
+      return Boolean(fd.directDeposit?.enabled);
+    })();
     const ddSlipPurchased =
       ent.documentType === "paystub" &&
       template.renderer !== "check-statement" &&
-      Boolean(
-        ent.order.items?.some((i) => i.productCode === PAYSTUB_DD_SLIP_PRODUCT_CODE),
-      );
+      orderBoughtDd &&
+      formWantsDd;
     const formDataForStore =
       ent.documentType === "paystub"
         ? applyPaystubDdSlipEntitlement(input.formData, ddSlipPurchased)
