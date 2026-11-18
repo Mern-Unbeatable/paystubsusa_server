@@ -11,7 +11,12 @@ const toUsage = <T extends { _count: { documents: number } }>({ _count, ...row }
   usage: { documents: _count.documents },
 });
 
-const order = [{ documentType: "asc" }, { sortOrder: "asc" }, { code: "asc" }] satisfies Prisma.DocumentTemplateOrderByWithRelationInput[];
+const order = [
+  { documentType: "asc" },
+  { sortOrder: "asc" },
+  { createdAt: "asc" },
+  { code: "asc" },
+] satisfies Prisma.DocumentTemplateOrderByWithRelationInput[];
 
 export class PrismaTemplateRepository implements TemplateRepository {
   list({ activeOnly, documentType }: { activeOnly: boolean; documentType?: DocumentType }) {
@@ -50,6 +55,15 @@ export class PrismaTemplateRepository implements TemplateRepository {
   async findWithUsage(id: string) {
     const row = await prisma.documentTemplate.findUnique({ where: { id }, include: withUsage });
     return row ? toUsage(row) : null;
+  }
+
+  async maxSortOrder(documentType: DocumentType) {
+    const row = await prisma.documentTemplate.findFirst({
+      where: { documentType },
+      orderBy: { sortOrder: "desc" },
+      select: { sortOrder: true },
+    });
+    return row?.sortOrder ?? 0;
   }
 
   async create({ variant, ...input }: NewTemplate) {

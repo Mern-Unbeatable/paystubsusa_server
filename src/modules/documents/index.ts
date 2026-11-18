@@ -5,6 +5,7 @@ export { listDocumentsQuery } from "./documents.schemas.ts";
 export { calculatePaystub, displayFields, validateFormData } from "./form-data.ts";
 export {
   applyPaystubDdSlipEntitlement,
+  normalizePaystubFormData,
   PAYSTUB_SCHEMA_VERSION,
 } from "./paystub-form.ts";
 export type { DocumentRepository, DocumentScope } from "./repositories/document.repository.ts";

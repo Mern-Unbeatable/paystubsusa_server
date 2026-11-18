@@ -49,15 +49,16 @@ const products: SeedProduct[] = [
   },
 ];
 
+// Slot order: keep 01/03/05/07/09/10; swap former 02↔04 and 06↔08 designs into those codes.
 const paystubVariants = [
   ["01", "Classic layout", { headerVariant: "dark-full", netPayVariant: "dark", tableVariant: "light-blue" }],
-  ["02", "Minimal layout", { headerVariant: "minimal-blue-line", netPayVariant: "blue", tableVariant: "solid-blue" }],
+  ["02", "Corporate layout", { headerVariant: "split-dark", netPayVariant: "dark", tableVariant: "solid-dark" }],
   ["03", "Boxed layout", { headerVariant: "boxed", netPayVariant: "blue", tableVariant: "light-blue" }],
-  ["04", "Corporate layout", { headerVariant: "split-dark", netPayVariant: "dark", tableVariant: "solid-dark" }],
+  ["04", "Minimal layout", { headerVariant: "minimal-blue-line", netPayVariant: "blue", tableVariant: "solid-blue" }],
   ["05", "Modern layout", { headerVariant: "blue-full", netPayVariant: "blue", tableVariant: "solid-blue" }],
-  ["06", "Executive layout", { headerVariant: "minimal-dark-line", netPayVariant: "dark", tableVariant: "minimal-gray" }],
+  ["06", "Compact layout", { headerVariant: "split-blue", netPayVariant: "blue", tableVariant: "light-blue" }],
   ["07", "Detailed layout", { headerVariant: "boxed", netPayVariant: "dark", tableVariant: "solid-dark" }],
-  ["08", "Compact layout", { headerVariant: "split-blue", netPayVariant: "blue", tableVariant: "light-blue" }],
+  ["08", "Executive layout", { headerVariant: "minimal-dark-line", netPayVariant: "dark", tableVariant: "minimal-gray" }],
 ] as const;
 
 const classic = { headerVariant: "dark-full", netPayVariant: "dark", tableVariant: "light-blue" };
@@ -76,10 +77,23 @@ async function main() {
     await prisma.product.upsert({ where: { code: p.code }, create: p, update: {} });
   }
   for (const t of templates) {
+    const title = `Template ${t.code}`;
     await prisma.documentTemplate.upsert({
       where: { documentType_code: { documentType: t.documentType, code: t.code } },
-      create: { ...t, title: `Template ${t.code}`, variant: t.variant ?? undefined, isDefault: t.code === "01" },
-      update: {},
+      create: {
+        ...t,
+        title,
+        variant: t.variant ?? undefined,
+        isDefault: t.code === "01",
+      },
+      // Replace layout/copy on re-seed so admin + catalog stay aligned with seed order.
+      update: {
+        title,
+        subtitle: t.subtitle,
+        renderer: t.renderer,
+        variant: t.variant ?? undefined,
+        sortOrder: t.sortOrder,
+      },
     });
   }
 

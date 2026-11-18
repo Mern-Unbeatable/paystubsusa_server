@@ -3,7 +3,10 @@ import { conflict, notFound } from "../../shared/http/app-error.ts";
 import type { TransactionManager, Tx } from "../../shared/db/transaction.ts";
 import { canAccessOrder, DOWNLOADABLE_ORDER_STATUSES } from "../../shared/policies/access.ts";
 import type { GuestPrincipal, UserPrincipal } from "../../shared/types.ts";
-import type { CatalogService } from "../catalog/index.ts";
+import {
+  PAYSTUB_DD_SLIP_PRODUCT_CODE,
+  type CatalogService,
+} from "../catalog/index.ts";
 import {
   applyPaystubDdSlipEntitlement,
   type DocumentsService,
@@ -41,11 +44,21 @@ export class EntitlementsService {
     if (!DOWNLOADABLE_ORDER_STATUSES.includes(ent.order.status)) throw conflict("ORDER_NOT_PAID", "This order isn't paid");
     if (ent.creditsUsed >= ent.creditsTotal) throw conflict("NO_CREDITS_REMAINING", "You have no paystub credits left on this order");
 
-    await this.d.catalog.requireActiveTemplate(input.templateId, ent.documentType);
-    // Credit-redeemed paystubs never include a paid Direct Deposit Slip.
+    const template = await this.d.catalog.requireActiveTemplate(
+      input.templateId,
+      ent.documentType,
+    );
+    // Honor DD on credit redemptions when the parent order purchased the add-on
+    // (except template 10 / check-statement, which never renders a slip).
+    const ddSlipPurchased =
+      ent.documentType === "paystub" &&
+      template.renderer !== "check-statement" &&
+      Boolean(
+        ent.order.items?.some((i) => i.productCode === PAYSTUB_DD_SLIP_PRODUCT_CODE),
+      );
     const formDataForStore =
       ent.documentType === "paystub"
-        ? applyPaystubDdSlipEntitlement(input.formData, false)
+        ? applyPaystubDdSlipEntitlement(input.formData, ddSlipPurchased)
         : input.formData;
     const prepared = await this.d.documents.prepare(
       ent.documentType,

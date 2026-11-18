@@ -107,6 +107,7 @@ export const toTemplateDto = (t: TemplateRow) => ({
   variant: t.variant,
   isDefault: t.isDefault,
   sortOrder: t.sortOrder,
+  createdAt: t.createdAt,
   /** Relative to the API base (e.g. `/template-previews/<id>.webp`); null when none is set. */
   previewImageUrl: t.previewImageKey ? `/${t.previewImageKey}` : null,
 });
@@ -283,7 +284,9 @@ export class CatalogService {
     if (variantless && input.variant) throw validation({ variant: ["This layout has no style options"] });
     if (!variantless && !input.variant) throw validation({ variant: ["Choose the layout style"] });
     if (input.variant?.theme && input.renderer !== THEMEABLE_RENDERER) throw themeUnsupported();
-    const created = await this.templates.create(input);
+    // Always append new templates after the current last of this document type.
+    const sortOrder = (await this.templates.maxSortOrder(input.documentType)) + 1;
+    const created = await this.templates.create({ ...input, sortOrder });
     if (!created) throw conflict("TEMPLATE_CODE_TAKEN", "A template with this code already exists for this document type");
     return created;
   }

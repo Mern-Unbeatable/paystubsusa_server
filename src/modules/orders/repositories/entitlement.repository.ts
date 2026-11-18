@@ -12,7 +12,13 @@ export interface EntitlementRow {
 }
 
 export interface EntitlementWithOrder extends EntitlementRow {
-  order: { id: string; userId: string | null; email: string; status: OrderStatus };
+  order: {
+    id: string;
+    userId: string | null;
+    email: string;
+    status: OrderStatus;
+    items?: { productCode: string }[];
+  };
 }
 
 export interface EntitlementRepository {

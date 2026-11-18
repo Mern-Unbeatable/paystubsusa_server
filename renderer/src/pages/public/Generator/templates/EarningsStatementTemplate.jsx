@@ -106,10 +106,9 @@ const DeductionRows = ({ items }) =>
     />
   ));
 
-/** Template 09 — ADP-style "Earnings Statement" with a voided advice check. */
+/** Template 09 — ADP-style "Earnings Statement"; optional shared DD slip at the foot. */
 const EarningsStatementTemplate = ({ data }) => {
   const { company, employee, period, earnings, taxes, deductions, totals, reference } = data;
-  // Paid DD slip replaces the voided check (one stub only).
   const showDdSlip = shouldRenderDirectDepositSlip(data.directDeposit);
 
   return (
@@ -252,120 +251,7 @@ const EarningsStatementTemplate = ({ data }) => {
         <div style={at(57, 753, { width: 701 })}>
           <DirectDepositSlip data={data} embedded />
         </div>
-      ) : (
-        <>
-          {/* Tear line */}
-          <div
-            style={at(57, 753, {
-              width: 701,
-              height: 2,
-              backgroundImage:
-                "repeating-linear-gradient(90deg, #333333 0 12px, transparent 12px 20px)",
-            })}
-          />
-
-          {/* Voided check / advice stub */}
-          <div
-            style={at(company.logo ? 64 : 80, 796, {
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-            })}
-          >
-            {company.logo && (
-              <>
-                <CompanyLogo
-                  src={company.logo}
-                  boxWidth={100}
-                  boxHeight={60}
-                  shrink
-                />
-                <div
-                  style={{
-                    alignSelf: "stretch",
-                    width: 1,
-                    background: "#9a9a9a",
-                  }}
-                />
-              </>
-            )}
-            <div
-              style={{
-                fontSize: 11.5,
-                lineHeight: "15.5px",
-                whiteSpace: "nowrap",
-              }}
-            >
-              <div>{company.name}</div>
-              <div>{company.address}</div>
-              <div>{company.cityLine}</div>
-              {company.phone && <div>{company.phone}</div>}
-            </div>
-          </div>
-          <div style={at(474, 796, { fontSize: 11.5, lineHeight: "15.5px" })}>
-            {[
-              ["Advice Number:", reference.adviceNumber, true],
-              ["Pay date:", period.payDate],
-              ["Social Security Number:", employee.ssnMasked],
-            ].map(([label, value, bold]) => (
-              <div key={label} style={{ display: "flex" }}>
-                <span style={{ width: 159, fontWeight: bold ? 700 : 400 }}>
-                  {label}
-                </span>
-                <span>{value}</span>
-              </div>
-            ))}
-          </div>
-
-          <div style={at(178, 873, { fontSize: 9, lineHeight: "12px" })}>
-            <div>Pay to the</div>
-            <div>order of:</div>
-          </div>
-          <div
-            style={at(247, 877, {
-              fontSize: 15,
-              fontWeight: 700,
-              maxWidth: 480,
-              whiteSpace: "nowrap",
-            })}
-          >
-            {employee.name}
-          </div>
-          <div style={at(176, 897, { width: 563, borderTop: RULE })} />
-          <div style={at(178, 902, { fontSize: 9.5 })}>This amount:</div>
-          <div
-            style={at(243, 897, {
-              width: 496,
-              height: 21,
-              borderLeft: RULE,
-              borderRight: RULE,
-              borderBottom: RULE,
-              boxSizing: "border-box",
-              fontSize: 9.5,
-              lineHeight: "19px",
-            })}
-          >
-            <span
-              style={at(6, 0, {
-                width: 390,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-              })}
-            >
-              {totals.netWords}
-            </span>
-            <div style={at(398, -1, { height: 21, borderLeft: RULE })} />
-            <span style={at(400, 0, { width: 88, textAlign: "right" })}>
-              {totals.net}
-            </span>
-          </div>
-
-          <div style={at(544, 931, { fontSize: 16, fontWeight: 700 })}>
-            NON-NEGOTIABLE
-          </div>
-          <div style={at(544, 951, { fontSize: 14 })}>VOIDED CHECK</div>
-        </>
-      )}
+      ) : null}
     </div>
   );
 };
