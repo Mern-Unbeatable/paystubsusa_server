@@ -33,9 +33,7 @@
     { "desc": "State Income Tax", "amount": "$92.40" }
   ],
   "totalTaxes": "$529.38",
-  "deductions": [
-    { "desc": "401(k)", "amount": "$120.00" }
-  ],
+  "deductions": [{ "desc": "401(k)", "amount": "$120.00" }],
   "totalDeductions": "$120.00",
   "summary": {
     "gross": "$2,558.00",

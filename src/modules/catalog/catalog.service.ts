@@ -4,7 +4,11 @@ import type { ObjectStorage } from "../../integrations/storage.ts";
 import { conflict, notFound, validation } from "../../shared/http/app-error.ts";
 import type { PageRequest } from "../../shared/http/pagination.ts";
 import { logger } from "../../shared/logger.ts";
-import { TEMPLATE_RENDERERS, THEMEABLE_RENDERER, VARIANTLESS_RENDERERS } from "./catalog.schemas.ts";
+import {
+  TEMPLATE_RENDERERS,
+  THEMEABLE_RENDERER,
+  VARIANTLESS_RENDERERS,
+} from "./catalog.schemas.ts";
 import { normalizePreview } from "./template-preview.ts";
 import type {
   NewProduct,
@@ -32,20 +36,25 @@ export const PAYSTUB_DD_SLIP_PRODUCT_CODE = "paystub_dd_slip";
  * restyled while unused, but never deleted. A restyle shows only when the API is reachable.
  */
 const SYSTEM_TEMPLATE_KEYS: ReadonlySet<string> = new Set([
-  ...["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"].map((code) => `paystub:${code}`),
+  ...["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"].map(
+    (code) => `paystub:${code}`,
+  ),
   "w2:01",
   "nec1099:01",
   "direct_deposit:01",
 ]);
 
-export const isSystemTemplate = (t: { documentType: DocumentType; code: string }) =>
-  SYSTEM_TEMPLATE_KEYS.has(`${t.documentType}:${t.code}`);
+export const isSystemTemplate = (t: {
+  documentType: DocumentType;
+  code: string;
+}) => SYSTEM_TEMPLATE_KEYS.has(`${t.documentType}:${t.code}`);
 
 /** Issued documents re-render from the template on regeneration, so a used layout is frozen. */
 export const canEditTemplateLayout = (t: TemplateWithUsage) =>
   !VARIANTLESS_RENDERERS.has(t.renderer) && t.usage.documents === 0;
 
-export const canDeleteTemplate = (t: TemplateWithUsage) => !isSystemTemplate(t) && !t.isDefault && t.usage.documents === 0;
+export const canDeleteTemplate = (t: TemplateWithUsage) =>
+  !isSystemTemplate(t) && !t.isDefault && t.usage.documents === 0;
 
 /**
  * Seeded products that checkout, subscriptions and order summaries depend on by code.
@@ -113,14 +122,21 @@ export const toTemplateDto = (t: TemplateRow) => ({
 });
 
 const itemsError = (message: string) => validation({ items: [message] });
-const themeUnsupported = () => validation({ variant: ["This layout doesn't support custom colours and typography"] });
+const themeUnsupported = () =>
+  validation({
+    variant: ["This layout doesn't support custom colours and typography"],
+  });
 
 export class CatalogService {
   private readonly products: ProductRepository;
   private readonly templates: TemplateRepository;
   private readonly storage: ObjectStorage;
 
-  constructor(products: ProductRepository, templates: TemplateRepository, storage: ObjectStorage) {
+  constructor(
+    products: ProductRepository,
+    templates: TemplateRepository,
+    storage: ObjectStorage,
+  ) {
     this.products = products;
     this.templates = templates;
     this.storage = storage;
@@ -131,14 +147,18 @@ export class CatalogService {
   }
 
   async listTemplates(documentType?: DocumentType) {
-    return (await this.templates.list({ activeOnly: true, documentType })).map(toTemplateDto);
+    return (await this.templates.list({ activeOnly: true, documentType })).map(
+      toTemplateDto,
+    );
   }
 
   /** An active template of the given type, or 422. */
   async requireActiveTemplate(templateId: string, documentType: DocumentType) {
     const t = await this.templates.findById(templateId);
     if (!t || !t.isActive || t.documentType !== documentType) {
-      throw validation({ templateId: ["Choose an available template for this document"] });
+      throw validation({
+        templateId: ["Choose an available template for this document"],
+      });
     }
     return t;
   }
@@ -152,20 +172,29 @@ export class CatalogService {
    * quantity 1; paystub add-ons are `paystub_additional` (1–50) and optional `paystub_dd_slip`
    * (qty 1); the subscription plan is quoted alone.
    */
-  async quote(items: { productCode: string; quantity: number }[]): Promise<Quote> {
+  async quote(
+    items: { productCode: string; quantity: number }[],
+  ): Promise<Quote> {
     if (items.length === 0) throw itemsError("Add at least one product");
     const codes = items.map((i) => i.productCode);
-    if (new Set(codes).size !== codes.length) throw itemsError("Each product can appear only once");
+    if (new Set(codes).size !== codes.length)
+      throw itemsError("Each product can appear only once");
 
-    const found = new Map((await this.products.findByCodes(codes)).map((p) => [p.code, p]));
+    const found = new Map(
+      (await this.products.findByCodes(codes)).map((p) => [p.code, p]),
+    );
     const resolved = items.map((i) => {
       const p = found.get(i.productCode);
-      if (!p || !p.isActive) throw itemsError(`Unknown or unavailable product: ${i.productCode}`);
+      if (!p || !p.isActive)
+        throw itemsError(`Unknown or unavailable product: ${i.productCode}`);
       return { product: p, quantity: i.quantity };
     });
 
-    const subscription = resolved.filter((r) => r.product.kind === "subscription");
-    if (subscription.length > 0 && resolved.length > 1) throw itemsError("The subscription plan must be ordered on its own");
+    const subscription = resolved.filter(
+      (r) => r.product.kind === "subscription",
+    );
+    if (subscription.length > 0 && resolved.length > 1)
+      throw itemsError("The subscription plan must be ordered on its own");
 
     const bases = resolved.filter((r) => !r.product.isAddon);
     const addons = resolved.filter((r) => r.product.isAddon);
@@ -175,7 +204,10 @@ export class CatalogService {
 
     const documentType = base.product.documentType;
     for (const a of addons) {
-      if (a.product.documentType !== documentType || documentType !== "paystub") {
+      if (
+        a.product.documentType !== documentType ||
+        documentType !== "paystub"
+      ) {
         throw itemsError(`${a.product.name} can't be added to this package`);
       }
       if (a.product.code === PAYSTUB_DD_SLIP_PRODUCT_CODE) {
@@ -185,12 +217,15 @@ export class CatalogService {
         continue;
       }
       if (a.quantity < 1 || a.quantity > MAX_ADDITIONAL_PAYSTUBS) {
-        throw itemsError(`Additional paystubs must be between 1 and ${MAX_ADDITIONAL_PAYSTUBS}`);
+        throw itemsError(
+          `Additional paystubs must be between 1 and ${MAX_ADDITIONAL_PAYSTUBS}`,
+        );
       }
     }
 
     const currency = base.product.currency;
-    if (resolved.some((r) => r.product.currency !== currency)) throw itemsError("Products must share one currency");
+    if (resolved.some((r) => r.product.currency !== currency))
+      throw itemsError("Products must share one currency");
 
     const lines = resolved.map(({ product, quantity }) => ({
       productId: product.id,
@@ -205,7 +240,10 @@ export class CatalogService {
       documentType,
       isSubscription: subscription.length > 0,
       lines,
-      credits: resolved.reduce((s, r) => s + r.product.creditQuantity * r.quantity, 0),
+      credits: resolved.reduce(
+        (s, r) => s + r.product.creditQuantity * r.quantity,
+        0,
+      ),
       subtotalCents,
       taxCents: 0,
       totalCents: subtotalCents,
@@ -234,15 +272,24 @@ export class CatalogService {
    */
   async createProduct(input: NewProduct) {
     if (input.creditQuantity > 1 && input.documentType !== "paystub") {
-      throw validation({ creditQuantity: ["Only paystub packages can include more than one document"] });
+      throw validation({
+        creditQuantity: [
+          "Only paystub packages can include more than one document",
+        ],
+      });
     }
     const created = await this.products.create(input);
-    if (!created) throw conflict("PRODUCT_CODE_TAKEN", "A product with this code already exists");
+    if (!created)
+      throw conflict(
+        "PRODUCT_CODE_TAKEN",
+        "A product with this code already exists",
+      );
     return created;
   }
 
   async updateProduct(code: string, input: ProductUpdate) {
-    if (!(await this.products.findByCode(code))) throw notFound("PRODUCT_NOT_FOUND", "Product not found");
+    if (!(await this.products.findByCode(code)))
+      throw notFound("PRODUCT_NOT_FOUND", "Product not found");
     return this.products.update(code, input);
   }
 
@@ -250,10 +297,20 @@ export class CatalogService {
   async deleteProduct(code: string) {
     const p = await this.findProductWithUsage(code);
     if (SYSTEM_PRODUCT_CODES.has(p.code)) {
-      throw conflict("PRODUCT_PROTECTED", "This product is required by checkout and can only be deactivated");
+      throw conflict(
+        "PRODUCT_PROTECTED",
+        "This product is required by checkout and can only be deactivated",
+      );
     }
-    if (p.usage.orderItems > 0 || p.usage.subscriptions > 0 || !(await this.products.delete(p.id))) {
-      throw conflict("PRODUCT_IN_USE", "This product is used by existing orders or subscriptions; deactivate it instead");
+    if (
+      p.usage.orderItems > 0 ||
+      p.usage.subscriptions > 0 ||
+      !(await this.products.delete(p.id))
+    ) {
+      throw conflict(
+        "PRODUCT_IN_USE",
+        "This product is used by existing orders or subscriptions; deactivate it instead",
+      );
     }
     return p;
   }
@@ -278,23 +335,40 @@ export class CatalogService {
   async createTemplate(input: NewTemplate) {
     const renderers: readonly string[] = TEMPLATE_RENDERERS[input.documentType];
     if (!renderers.includes(input.renderer)) {
-      throw validation({ renderer: ["This layout is not available for the selected document type"] });
+      throw validation({
+        renderer: [
+          "This layout is not available for the selected document type",
+        ],
+      });
     }
     const variantless = VARIANTLESS_RENDERERS.has(input.renderer);
-    if (variantless && input.variant) throw validation({ variant: ["This layout has no style options"] });
-    if (!variantless && !input.variant) throw validation({ variant: ["Choose the layout style"] });
-    if (input.variant?.theme && input.renderer !== THEMEABLE_RENDERER) throw themeUnsupported();
+    if (variantless && input.variant)
+      throw validation({ variant: ["This layout has no style options"] });
+    if (!variantless && !input.variant)
+      throw validation({ variant: ["Choose the layout style"] });
+    if (input.variant?.theme && input.renderer !== THEMEABLE_RENDERER)
+      throw themeUnsupported();
     // Always append new templates after the current last of this document type.
-    const sortOrder = (await this.templates.maxSortOrder(input.documentType)) + 1;
+    const sortOrder =
+      (await this.templates.maxSortOrder(input.documentType)) + 1;
     const created = await this.templates.create({ ...input, sortOrder });
-    if (!created) throw conflict("TEMPLATE_CODE_TAKEN", "A template with this code already exists for this document type");
+    if (!created)
+      throw conflict(
+        "TEMPLATE_CODE_TAKEN",
+        "A template with this code already exists for this document type",
+      );
     return created;
   }
 
-  async updateTemplate(id: string, input: Omit<TemplateUpdate, "previewImageKey">) {
+  async updateTemplate(
+    id: string,
+    input: Omit<TemplateUpdate, "previewImageKey">,
+  ) {
     const t = await this.findTemplateWithUsage(id);
     if (input.isActive === false && t.isDefault) {
-      throw validation({ isActive: ["Set another default template before deactivating this one"] });
+      throw validation({
+        isActive: ["Set another default template before deactivating this one"],
+      });
     }
     if (input.variant && !canEditTemplateLayout(t)) {
       throw conflict(
@@ -302,13 +376,17 @@ export class CatalogService {
         "This template's layout can't be changed because documents were issued with it; create a new template instead",
       );
     }
-    if (input.variant?.theme && t.renderer !== THEMEABLE_RENDERER) throw themeUnsupported();
+    if (input.variant?.theme && t.renderer !== THEMEABLE_RENDERER)
+      throw themeUnsupported();
     return this.templates.update(id, input);
   }
 
   async setDefaultTemplate(id: string) {
     const t = await this.findTemplate(id);
-    if (!t.isActive) throw validation({ id: ["Activate the template before making it the default"] });
+    if (!t.isActive)
+      throw validation({
+        id: ["Activate the template before making it the default"],
+      });
     return this.templates.setDefault(id);
   }
 
@@ -316,11 +394,21 @@ export class CatalogService {
   async deleteTemplate(id: string) {
     const t = await this.findTemplateWithUsage(id);
     if (isSystemTemplate(t)) {
-      throw conflict("TEMPLATE_PROTECTED", "Built-in templates can only be deactivated");
+      throw conflict(
+        "TEMPLATE_PROTECTED",
+        "Built-in templates can only be deactivated",
+      );
     }
-    if (t.isDefault) throw conflict("TEMPLATE_IS_DEFAULT", "Set another default template before deleting this one");
+    if (t.isDefault)
+      throw conflict(
+        "TEMPLATE_IS_DEFAULT",
+        "Set another default template before deleting this one",
+      );
     if (t.usage.documents > 0 || !(await this.templates.delete(t.id))) {
-      throw conflict("TEMPLATE_IN_USE", "Documents were issued with this template; deactivate it instead");
+      throw conflict(
+        "TEMPLATE_IN_USE",
+        "Documents were issued with this template; deactivate it instead",
+      );
     }
     if (t.previewImageKey) this.deleteObject(t.previewImageKey);
     return t;
@@ -349,6 +437,10 @@ export class CatalogService {
   }
 
   private deleteObject(key: string) {
-    this.storage.delete(key).catch((err) => logger.warn({ err }, "Could not delete template preview"));
+    this.storage
+      .delete(key)
+      .catch((err) =>
+        logger.warn({ err }, "Could not delete template preview"),
+      );
   }
 }

@@ -4,8 +4,18 @@ import type { Tx } from "../../../shared/db/transaction.ts";
 import type { EntitlementRepository } from "./entitlement.repository.ts";
 
 export class PrismaEntitlementRepository implements EntitlementRepository {
-  async create(input: { orderId: string; documentType: DocumentType; creditsTotal: number; creditsUsed: number }, tx: Tx) {
-    return (await dbOf(tx).entitlement.create({ data: input, select: { id: true } })).id;
+  async create(
+    input: {
+      orderId: string;
+      documentType: DocumentType;
+      creditsTotal: number;
+      creditsUsed: number;
+    },
+    tx: Tx,
+  ) {
+    return (
+      await dbOf(tx).entitlement.create({ data: input, select: { id: true } })
+    ).id;
   }
 
   findWithOrder(id: string) {
@@ -26,7 +36,10 @@ export class PrismaEntitlementRepository implements EntitlementRepository {
   }
 
   listForOrder(orderId: string) {
-    return prisma.entitlement.findMany({ where: { orderId }, orderBy: { createdAt: "asc" } });
+    return prisma.entitlement.findMany({
+      where: { orderId },
+      orderBy: { createdAt: "asc" },
+    });
   }
 
   async consumeCredit(id: string, tx: Tx) {

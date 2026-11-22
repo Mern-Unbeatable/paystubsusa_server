@@ -52,8 +52,14 @@ export interface TemplateUpdate {
 }
 
 export interface TemplateRepository {
-  list(options: { activeOnly: boolean; documentType?: DocumentType }): Promise<TemplateRow[]>;
-  search(filter: TemplateFilter, page: PageRequest): Promise<{ items: TemplateWithUsage[]; total: number }>;
+  list(options: {
+    activeOnly: boolean;
+    documentType?: DocumentType;
+  }): Promise<TemplateRow[]>;
+  search(
+    filter: TemplateFilter,
+    page: PageRequest,
+  ): Promise<{ items: TemplateWithUsage[]; total: number }>;
   findById(id: string): Promise<TemplateRow | null>;
   findWithUsage(id: string): Promise<TemplateWithUsage | null>;
   /** Highest sortOrder for this document type, or 0 when none exist. */
