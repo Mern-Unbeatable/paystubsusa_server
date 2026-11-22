@@ -73,4 +73,16 @@ describe("CatalogService.quote", () => {
   ])("rejects invalid combinations (%#)", async (items, message) => {
     await expect(service.quote(items)).rejects.toMatchObject({ status: 422, errors: { items: [expect.stringContaining(message)] } });
   });
+
+  it("rejects Unlimited when the global subscription product is Inactive", async () => {
+    const inactiveCatalog = catalog.map((p) => (p.code === "unlimited_monthly" ? { ...p, isActive: false } : p));
+    const inactiveProducts = {
+      findByCodes: async (codes: string[]) => inactiveCatalog.filter((p) => codes.includes(p.code)),
+    } as unknown as ProductRepository;
+    const inactiveService = new CatalogService(inactiveProducts, {} as TemplateRepository, {} as ObjectStorage);
+    await expect(inactiveService.quote([{ productCode: "unlimited_monthly", quantity: 1 }])).rejects.toMatchObject({
+      status: 422,
+      errors: { items: [expect.stringContaining("Unknown")] },
+    });
+  });
 });
