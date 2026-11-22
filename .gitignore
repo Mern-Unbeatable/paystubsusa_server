@@ -15,5 +15,4 @@ config.bat
 branch_structure.json
 
 # Environment variables
-.env
 !.env.example
