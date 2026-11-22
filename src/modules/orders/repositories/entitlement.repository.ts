@@ -1,4 +1,7 @@
-import type { DocumentType, OrderStatus } from "../../../generated/prisma/enums.ts";
+import type {
+  DocumentType,
+  OrderStatus,
+} from "../../../generated/prisma/enums.ts";
 import type { Tx } from "../../../shared/db/transaction.ts";
 
 export interface EntitlementRow {
@@ -22,7 +25,15 @@ export interface EntitlementWithOrder extends EntitlementRow {
 }
 
 export interface EntitlementRepository {
-  create(input: { orderId: string; documentType: DocumentType; creditsTotal: number; creditsUsed: number }, tx: Tx): Promise<string>;
+  create(
+    input: {
+      orderId: string;
+      documentType: DocumentType;
+      creditsTotal: number;
+      creditsUsed: number;
+    },
+    tx: Tx,
+  ): Promise<string>;
   findWithOrder(id: string): Promise<EntitlementWithOrder | null>;
   listForOrder(orderId: string): Promise<EntitlementRow[]>;
   /** credits_used += 1 only while credits remain; false when exhausted. */

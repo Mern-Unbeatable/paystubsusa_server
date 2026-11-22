@@ -7,18 +7,16 @@
 "build": "prisma generate && npm run build:renderer",
 "dev": "node --watch --env-file-if-exists=.env src/server.ts",
 "start": "node scripts/ensure-chromium.mjs && node --env-file-if-exists=.env src/server.ts",
-
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:unit": "vitest run test/unit",
-    "test:integration": "vitest run test/integration",
-    "prisma:generate": "prisma generate",
-    "db:migrate": "prisma migrate deploy",
-    "db:migrate:dev": "prisma migrate dev",
-    "db:seed": "prisma db seed",
-    "keys:generate": "node scripts/generate-keys.ts",
-    "smoke:render": "node --env-file-if-exists=.env scripts/smoke-render.mjs"
-
+"typecheck": "tsc --noEmit",
+"test": "vitest run",
+"test:unit": "vitest run test/unit",
+"test:integration": "vitest run test/integration",
+"prisma:generate": "prisma generate",
+"db:migrate": "prisma migrate deploy",
+"db:migrate:dev": "prisma migrate dev",
+"db:seed": "prisma db seed",
+"keys:generate": "node scripts/generate-keys.ts",
+"smoke:render": "node --env-file-if-exists=.env scripts/smoke-render.mjs"
 },
 "license": "UNLICENSED",
 "type": "module",

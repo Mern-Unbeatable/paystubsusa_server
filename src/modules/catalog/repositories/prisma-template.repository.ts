@@ -2,11 +2,19 @@ import { Prisma } from "../../../generated/prisma/client.ts";
 import type { DocumentType } from "../../../generated/prisma/enums.ts";
 import { prisma } from "../../../shared/db/prisma.ts";
 import { skipTake, type PageRequest } from "../../../shared/http/pagination.ts";
-import type { NewTemplate, TemplateFilter, TemplateRepository, TemplateUpdate } from "./template.repository.ts";
+import type {
+  NewTemplate,
+  TemplateFilter,
+  TemplateRepository,
+  TemplateUpdate,
+} from "./template.repository.ts";
 
 const withUsage = { _count: { select: { documents: true } } } as const;
 
-const toUsage = <T extends { _count: { documents: number } }>({ _count, ...row }: T) => ({
+const toUsage = <T extends { _count: { documents: number } }>({
+  _count,
+  ...row
+}: T) => ({
   ...row,
   usage: { documents: _count.documents },
 });
@@ -19,7 +27,13 @@ const order = [
 ] satisfies Prisma.DocumentTemplateOrderByWithRelationInput[];
 
 export class PrismaTemplateRepository implements TemplateRepository {
-  list({ activeOnly, documentType }: { activeOnly: boolean; documentType?: DocumentType }) {
+  list({
+    activeOnly,
+    documentType,
+  }: {
+    activeOnly: boolean;
+    documentType?: DocumentType;
+  }) {
     return prisma.documentTemplate.findMany({
       where: { documentType, ...(activeOnly ? { isActive: true } : {}) },
       orderBy: order,
@@ -42,7 +56,12 @@ export class PrismaTemplateRepository implements TemplateRepository {
         : {}),
     };
     const [items, total] = await Promise.all([
-      prisma.documentTemplate.findMany({ where, include: withUsage, orderBy: order, ...skipTake(page) }),
+      prisma.documentTemplate.findMany({
+        where,
+        include: withUsage,
+        orderBy: order,
+        ...skipTake(page),
+      }),
       prisma.documentTemplate.count({ where }),
     ]);
     return { items: items.map(toUsage), total };
@@ -53,7 +72,10 @@ export class PrismaTemplateRepository implements TemplateRepository {
   }
 
   async findWithUsage(id: string) {
-    const row = await prisma.documentTemplate.findUnique({ where: { id }, include: withUsage });
+    const row = await prisma.documentTemplate.findUnique({
+      where: { id },
+      include: withUsage,
+    });
     return row ? toUsage(row) : null;
   }
 
@@ -68,9 +90,15 @@ export class PrismaTemplateRepository implements TemplateRepository {
 
   async create({ variant, ...input }: NewTemplate) {
     try {
-      return await prisma.documentTemplate.create({ data: { ...input, variant: variant ?? undefined, isDefault: false } });
+      return await prisma.documentTemplate.create({
+        data: { ...input, variant: variant ?? undefined, isDefault: false },
+      });
     } catch (err) {
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") return null;
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2002"
+      )
+        return null;
       throw err;
     }
   }
@@ -81,11 +109,19 @@ export class PrismaTemplateRepository implements TemplateRepository {
 
   setDefault(id: string) {
     return prisma.$transaction(async (db) => {
-      const target = await db.documentTemplate.findUniqueOrThrow({ where: { id } });
+      const target = await db.documentTemplate.findUniqueOrThrow({
+        where: { id },
+      });
       // Row locks on every template of this type serialize concurrent "set default" calls.
       await db.$queryRaw`SELECT id FROM document_templates WHERE document_type = ${target.documentType}::"DocumentType" FOR UPDATE`;
-      await db.documentTemplate.updateMany({ where: { documentType: target.documentType, isDefault: true }, data: { isDefault: false } });
-      return db.documentTemplate.update({ where: { id }, data: { isDefault: true } });
+      await db.documentTemplate.updateMany({
+        where: { documentType: target.documentType, isDefault: true },
+        data: { isDefault: false },
+      });
+      return db.documentTemplate.update({
+        where: { id },
+        data: { isDefault: true },
+      });
     });
   }
 
@@ -95,7 +131,11 @@ export class PrismaTemplateRepository implements TemplateRepository {
       return true;
     } catch (err) {
       // P2003: still referenced (FK restrict); P2025: already deleted.
-      if (err instanceof Prisma.PrismaClientKnownRequestError && ["P2003", "P2025"].includes(err.code)) return false;
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        ["P2003", "P2025"].includes(err.code)
+      )
+        return false;
       throw err;
     }
   }

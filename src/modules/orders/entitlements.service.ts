@@ -1,7 +1,10 @@
 import type { DocumentType } from "../../generated/prisma/enums.ts";
 import { conflict, notFound } from "../../shared/http/app-error.ts";
 import type { TransactionManager, Tx } from "../../shared/db/transaction.ts";
-import { canAccessOrder, DOWNLOADABLE_ORDER_STATUSES } from "../../shared/policies/access.ts";
+import {
+  canAccessOrder,
+  DOWNLOADABLE_ORDER_STATUSES,
+} from "../../shared/policies/access.ts";
 import type { GuestPrincipal, UserPrincipal } from "../../shared/types.ts";
 import {
   PAYSTUB_DD_SLIP_PRODUCT_CODE,
@@ -28,9 +31,17 @@ export class EntitlementsService {
     this.d = deps;
   }
 
-  async grant(orderId: string, documentType: DocumentType, creditsTotal: number, tx: Tx) {
+  async grant(
+    orderId: string,
+    documentType: DocumentType,
+    creditsTotal: number,
+    tx: Tx,
+  ) {
     if (creditsTotal <= 1) return null;
-    return this.d.entitlements.create({ orderId, documentType, creditsTotal, creditsUsed: 1 }, tx);
+    return this.d.entitlements.create(
+      { orderId, documentType, creditsTotal, creditsUsed: 1 },
+      tx,
+    );
   }
 
   listForOrder(orderId: string) {
@@ -38,11 +49,20 @@ export class EntitlementsService {
   }
 
   /** POST /documents: spend one credit on a new paystub and queue its render. */
-  async redeem(principal: UserPrincipal | GuestPrincipal, input: { entitlementId: string; templateId: string; formData: unknown }) {
+  async redeem(
+    principal: UserPrincipal | GuestPrincipal,
+    input: { entitlementId: string; templateId: string; formData: unknown },
+  ) {
     const ent = await this.d.entitlements.findWithOrder(input.entitlementId);
-    if (!ent || !canAccessOrder(principal, ent.order)) throw notFound("ENTITLEMENT_NOT_FOUND", "Credits not found");
-    if (!DOWNLOADABLE_ORDER_STATUSES.includes(ent.order.status)) throw conflict("ORDER_NOT_PAID", "This order isn't paid");
-    if (ent.creditsUsed >= ent.creditsTotal) throw conflict("NO_CREDITS_REMAINING", "You have no paystub credits left on this order");
+    if (!ent || !canAccessOrder(principal, ent.order))
+      throw notFound("ENTITLEMENT_NOT_FOUND", "Credits not found");
+    if (!DOWNLOADABLE_ORDER_STATUSES.includes(ent.order.status))
+      throw conflict("ORDER_NOT_PAID", "This order isn't paid");
+    if (ent.creditsUsed >= ent.creditsTotal)
+      throw conflict(
+        "NO_CREDITS_REMAINING",
+        "You have no paystub credits left on this order",
+      );
 
     const template = await this.d.catalog.requireActiveTemplate(
       input.templateId,
@@ -51,7 +71,9 @@ export class EntitlementsService {
     // Credit docs get a DD slip only when the parent order bought it AND this
     // form still has the package toggle on (`directDeposit.enabled`).
     const orderBoughtDd = Boolean(
-      ent.order.items?.some((i) => i.productCode === PAYSTUB_DD_SLIP_PRODUCT_CODE),
+      ent.order.items?.some(
+        (i) => i.productCode === PAYSTUB_DD_SLIP_PRODUCT_CODE,
+      ),
     );
     const formWantsDd = (() => {
       const fd = input.formData as {
@@ -59,7 +81,8 @@ export class EntitlementsService {
         directDeposit?: { enabled?: boolean };
       } | null;
       if (!fd || typeof fd !== "object") return false;
-      if (fd.steps?.directDeposit) return Boolean(fd.steps.directDeposit.enabled);
+      if (fd.steps?.directDeposit)
+        return Boolean(fd.steps.directDeposit.enabled);
       return Boolean(fd.directDeposit?.enabled);
     })();
     const ddSlipPurchased =
@@ -78,15 +101,27 @@ export class EntitlementsService {
 
     const doc = await this.d.tx.run(async (tx) => {
       if (!(await this.d.entitlements.consumeCredit(ent.id, tx))) {
-        throw conflict("NO_CREDITS_REMAINING", "You have no paystub credits left on this order");
+        throw conflict(
+          "NO_CREDITS_REMAINING",
+          "You have no paystub credits left on this order",
+        );
       }
       const created = await this.d.documents.create(
-        { orderId: ent.orderId, templateId: input.templateId, entitlementId: ent.id, status: "queued", prepared },
+        {
+          orderId: ent.orderId,
+          templateId: input.templateId,
+          entitlementId: ent.id,
+          status: "queued",
+          prepared,
+        },
         tx,
       );
       await this.d.documents.enqueueRender(created.id, tx);
       return created;
     });
-    return { document: doc, creditsRemaining: ent.creditsTotal - ent.creditsUsed - 1 };
+    return {
+      document: doc,
+      creditsRemaining: ent.creditsTotal - ent.creditsUsed - 1,
+    };
   }
 }

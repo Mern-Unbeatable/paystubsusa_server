@@ -26,7 +26,17 @@ export class CustomerDashboardService {
       this.subscriptions.getMine(principal.userId),
     ]);
     return {
-      stats: { ...stats, subscription: sub ? { status: sub.status, planName: sub.planName } : null },
+      stats: {
+        ...stats,
+        subscription: sub
+          ? {
+              status: sub.status,
+              planName: sub.planName,
+              planAvailable: sub.planAvailable,
+              accessActive: sub.accessActive,
+            }
+          : null,
+      },
       recentDocuments: docs.data,
       recentPayments: payments.data,
     };

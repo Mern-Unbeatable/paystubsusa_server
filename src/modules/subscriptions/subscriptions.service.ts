@@ -114,25 +114,48 @@ export class SubscriptionsService {
     }
   }
 
-  /** Unlimited entitlement check; refreshes from Stripe first so a cancel without a webhook still ends access. */
+  /**
+   * Unlimited entitlement check; refreshes from Stripe first so a cancel without a webhook still ends access.
+   * Also requires the catalog `unlimited_monthly` product to be active (global Admin Pricing Plans switch).
+   * Stripe billing status is never rewritten here — deactivating the product only denies app access.
+   */
   async activeFor(userId: string) {
     await this.reconcile(userId);
+    if (!(await this.isPlanAvailable())) return null;
     return this.d.subscriptions.findActiveForUser(userId);
+  }
+
+  /** Whether Admin Pricing Plans has Unlimited marked Active. Independent of any user's Stripe status. */
+  async isPlanAvailable() {
+    const product = await this.d.catalog.findProduct(SUBSCRIPTION_PRODUCT_CODE);
+    return Boolean(product?.isActive);
+  }
+
+  /** Billing statuses that grant Unlimited while the global plan product is active. */
+  private billingGrantsAccess(status: SubscriptionStatus) {
+    return status === "active" || status === "past_due";
   }
 
   /** GET /me/subscription; null when the customer has never subscribed. */
   async getMine(userId: string) {
     await this.reconcile(userId);
+    const planAvailable = await this.isPlanAvailable();
     const s = await this.d.subscriptions.latestForUser(userId);
     if (!s) return null;
+    const accessActive = planAvailable && this.billingGrantsAccess(s.status);
     return {
       planName: s.product.name,
       amountCents: s.product.amountCents,
       currency: s.product.currency,
       interval: s.product.interval,
+      // Stripe-mirrored billing status — never overwritten by the global product switch.
       status: s.status,
       currentPeriodEnd: s.currentPeriodEnd,
       cancelAtPeriodEnd: s.cancelAtPeriodEnd,
+      // Global Admin Pricing Plans Active/Inactive for unlimited_monthly.
+      planAvailable,
+      // Application access: plan must be globally available AND billing must be active/past_due.
+      accessActive,
       // Card details live in the Stripe Customer Portal; invoice payments don't carry them.
       cardBrand: null,
       cardLast4: null,
