@@ -15,12 +15,65 @@ const optional = (max = 200) => text(max).optional().default("");
 const state = (label: string) => z.enum(US_STATES, { error: `${label} must be a US state` });
 const zip = (label: string) => z.string().trim().regex(/^\d{5}(-\d{4})?$/, `${label} must be a 5-digit ZIP code`);
 
-const SSN = /^\d{3}-?\d{2}-?\d{4}$/;
-const EIN = /^\d{2}-?\d{7}$/;
-const ssn = z.string().trim().regex(SSN, "Enter a valid SSN (XXX-XX-XXXX)");
-const ein = z.string().trim().regex(EIN, "Enter a valid EIN (XX-XXXXXXX)");
-const tin = z.string().trim().refine((v) => SSN.test(v) || EIN.test(v), "Enter a valid SSN or EIN");
-const optionalEin = z.string().trim().refine((v) => v === "" || EIN.test(v), "Enter a valid EIN (XX-XXXXXXX)").optional().default("");
+const SSN = /^\d{3}-\d{2}-\d{4}$/;
+const EIN = /^\d{2}-\d{7}$/;
+
+/** Digits-only → XXX-XX-XXXX when length is 9; otherwise trimmed original. */
+const normalizeSsn = (value: unknown) => {
+  if (typeof value !== "string") return value;
+  const digits = value.replace(/\D/g, "");
+  if (digits.length === 9) {
+    return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`;
+  }
+  return value.trim();
+};
+
+/** Digits-only → XX-XXXXXXX when length is 9; otherwise trimmed original. */
+const normalizeEin = (value: unknown) => {
+  if (typeof value !== "string") return value;
+  const digits = value.replace(/\D/g, "");
+  if (digits.length === 9) {
+    return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+  }
+  return value.trim();
+};
+
+const ssn = z.preprocess(
+  normalizeSsn,
+  z.string().regex(SSN, "Enter a valid SSN (XXX-XX-XXXX)"),
+);
+const ein = z.preprocess(
+  normalizeEin,
+  z.string().regex(EIN, "Enter a valid EIN (XX-XXXXXXX)"),
+);
+const tin = z.preprocess(
+  (value) => {
+    if (typeof value !== "string") return value;
+    const digits = value.replace(/\D/g, "");
+    if (digits.length === 9) {
+      // Prefer EIN shape when hyphen sat after 2 digits; else SSN.
+      const trimmed = value.trim();
+      if (/^\d{2}-\d{7}$/.test(trimmed) || /^\d{2}-?\d{7}$/.test(trimmed.replace(/\s/g, ""))) {
+        return normalizeEin(value);
+      }
+      return normalizeSsn(value);
+    }
+    return value.trim();
+  },
+  z.string().refine((v) => SSN.test(v) || EIN.test(v), "Enter a valid SSN or EIN"),
+);
+const optionalEin = z.preprocess(
+  (value) => {
+    if (typeof value !== "string") return value;
+    if (value.trim() === "") return "";
+    return normalizeEin(value);
+  },
+  z
+    .string()
+    .refine((v) => v === "" || EIN.test(v), "Enter a valid EIN (XX-XXXXXXX)")
+    .optional()
+    .default(""),
+);
 
 const MONEY = /^\d{1,3}(,\d{3})*(\.\d{1,2})?$|^\d+(\.\d{1,2})?$/;
 /** Free-text money such as "65,000.00"; the original string is kept for rendering. */
@@ -251,9 +304,20 @@ export const w2FormData = z.object({
   box8AllocatedTips: optionalMoney("Box 8"),
   box10DependentCare: optionalMoney("Box 10"),
   box11NonqualifiedPlans: optionalMoney("Box 11"),
-  box12Code: z.string().trim().regex(/^([A-Z]{1,2})?$/, "Box 12 code must be 1–2 letters").optional().default(""),
+  box12Code: z.preprocess(
+    (value) => {
+      if (value === undefined || value === null) return "";
+      if (typeof value !== "string") return value;
+      return value.trim().toUpperCase();
+    },
+    z.string().regex(/^([A-Z]{1,2})?$/, "Box 12 code must be 1-2 letters"),
+  ),
   box12Amount: optionalMoney("Box 12 amount"),
   box13StatutoryEmployee: z.boolean().default(false),
+  box13RetirementPlan: z.boolean().default(false),
+  box13ThirdPartySickPay: z.boolean().default(false),
+  box14Description: optional(50),
+  box14Amount: optionalMoney("Box 14 amount"),
   box15State: z.union([z.literal(""), state("Box 15 state")]).optional().default(""),
   box15StateId: optional(50),
   box16StateWages: optionalMoney("Box 16"),

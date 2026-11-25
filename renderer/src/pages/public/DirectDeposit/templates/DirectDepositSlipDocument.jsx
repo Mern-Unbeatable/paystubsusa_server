@@ -1,7 +1,19 @@
 import React from "react";
+import {
+  formatDisplayDate,
+  formatPayPeriodRange,
+} from "../utils/directDepositDates";
 
 const formatCityLine = (city, state, zip) =>
   [city, [state, zip].filter(Boolean).join(" ")].filter(Boolean).join(", ") ||
+  "—";
+
+const displayDepositDate = (formData) =>
+  formatDisplayDate(formData.depositDate) || "—";
+
+const displayPayPeriod = (formData) =>
+  formatPayPeriodRange(formData.payPeriodStart, formData.payPeriodEnd) ||
+  formData.payPeriod ||
   "—";
 
 const SectionTitle = ({ children }) => (
@@ -51,7 +63,7 @@ const DirectDepositSlipDocument = ({ formData }) => (
           ${formData.depositAmount || "0.00"}
         </p>
         <span className="text-[6.5px] text-slate-400 block mt-0.5">
-          Deposit date: {formData.depositDate || "—"}
+          Deposit date: {displayDepositDate(formData)}
         </span>
       </div>
     </div>
@@ -84,8 +96,8 @@ const DirectDepositSlipDocument = ({ formData }) => (
 
     <SectionTitle>Deposit Details</SectionTitle>
     <div className="p-3 grid grid-cols-2 gap-x-4 gap-y-2">
-      <Field label="Deposit Date" value={formData.depositDate} />
-      <Field label="Pay Period" value={formData.payPeriod} />
+      <Field label="Deposit Date" value={displayDepositDate(formData)} />
+      <Field label="Pay Period" value={displayPayPeriod(formData)} />
       <Field label="Payment Reference" value={formData.paymentReference} />
       <Field label="Bank Name" value={formData.bankName} />
       <Field label="Account Holder" value={formData.accountHolderName} />

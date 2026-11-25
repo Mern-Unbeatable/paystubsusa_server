@@ -17,15 +17,17 @@ const root = createRoot(container);
 const PAGE_WIDTH = 816;
 const PRINT_MARGIN = 32;
 const FORM_WIDTH = 480;
+/** Match W-2 live preview (`max-w-[540px]`). */
+const W2_FORM_WIDTH = 540;
 
 /** Letter-page wrapper matching PrintableDocument for tax/deposit forms. */
-const FormPage = ({ children }) => (
+const FormPage = ({ children, formWidth = FORM_WIDTH }) => (
   <div style={{ padding: PRINT_MARGIN }}>
     <div
       className="bg-white border border-slate-300"
       style={{
-        width: FORM_WIDTH,
-        zoom: (PAGE_WIDTH - PRINT_MARGIN * 2) / FORM_WIDTH,
+        width: formWidth,
+        zoom: (PAGE_WIDTH - PRINT_MARGIN * 2) / formWidth,
       }}
     >
       {children}
@@ -59,7 +61,7 @@ function renderForType(type, template, formData) {
     }
     case "w2":
       return (
-        <FormPage>
+        <FormPage formWidth={W2_FORM_WIDTH}>
           <W2FormDocument formData={formData} />
         </FormPage>
       );
